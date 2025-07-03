@@ -1,0 +1,38 @@
+server:
+  host: "${HOST:localhost}"
+  port: ${PORT:5334}
+  mode: "${GIN_MODE:debug}"
+  cert_file: "${CERT_FILE:}"
+  key_file: "${KEY_FILE:}"
+
+database:
+  type: "${DB_TYPE:postgres}"
+  host: "${DB_HOST:localhost}"
+  port: ${DB_PORT:5432}
+  username: "${DB_USERNAME:postgres}"
+  password: "${DB_PASSWORD:postgres}"
+  database: "${DB_DATABASE:ripple}"
+  ssl_mode: "${DB_SSL_MODE:disable}"
+  timezone: "${DB_TIMEZONE:UTC}"
+
+logger:
+  level: "${LOG_LEVEL:info}"
+  format: "${LOG_FORMAT:console}"
+  filename: "${LOG_FILENAME:logs/ripple.log}"
+  max_size: ${LOG_MAX_SIZE:10}
+  max_age: ${LOG_MAX_AGE:30}
+  max_backups: ${LOG_MAX_BACKUPS:5}
+  local_time: ${LOG_LOCAL_TIME:true}
+  compress: ${LOG_COMPRESS:true}
+  console: ${LOG_CONSOLE:true}
+  time_format: "${LOG_TIME_FORMAT:2006-01-02 15:04:05}"
+  timezone: "${LOG_TIMEZONE:Local}"
+
+notion:
+  token: "${NOTION_TOKEN:}"
+  database_id: "${NOTION_DATABASE_ID:}"
+  api_version: "${NOTION_API_VERSION:2022-06-28}"
+
+scheduler:
+  sync_interval: "${SYNC_INTERVAL:30m}"
+  enabled: ${SCHEDULER_ENABLED:true}
