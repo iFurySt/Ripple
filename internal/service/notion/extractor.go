@@ -1,8 +1,8 @@
 package notion
 
 import (
-	"fmt"
 	"github.com/ifuryst/ripple/internal/models"
+	"strings"
 	"time"
 )
 
@@ -118,7 +118,7 @@ func (s *Service) extractOwner(properties map[string]any) string {
 							}
 						}
 						if len(owners) > 0 {
-							return fmt.Sprintf("%v", owners)
+							return strings.Join(owners, ", ")
 						}
 					}
 				}
