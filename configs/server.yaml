@@ -42,7 +42,7 @@ publisher:
     enabled: ${AL_FOLIO_ENABLED:false}
     repo_url: "${AL_FOLIO_REPO_URL:https://github.com/iFurySt/ifuryst.github.io}"
     branch: "${AL_FOLIO_BRANCH:master}"
-    workspace_dir: "${AL_FOLIO_WORKSPACE:workplace}"
+    workspace_dir: "${AL_FOLIO_WORKSPACE:workspace}"
     base_url: "${AL_FOLIO_BASE_URL:https://ifuryst.github.io}"
     commit_message: "${AL_FOLIO_COMMIT_MESSAGE:Add new post via Ripple}"
     auto_publish: ${AL_FOLIO_AUTO_PUBLISH:false}

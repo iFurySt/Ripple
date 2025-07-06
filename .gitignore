@@ -34,4 +34,4 @@ go.work.sum
 temp
 bin
 logs
-workspace
+workspace/
