@@ -3,6 +3,7 @@ package al_folio
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -360,6 +361,12 @@ func (p *AlFolioPublisher) writePostFile(ctx context.Context, content publisher.
 		}, nil
 	}
 
+	// Run prettier to format the markdown file
+	if err := p.runPrettier(ctx); err != nil {
+		p.logger.Warn("Failed to run prettier, continuing without formatting",
+			zap.Error(err))
+	}
+
 	p.logger.Info("Post file created",
 		zap.String("filename", filename),
 		zap.String("path", relativePath),
@@ -388,4 +395,24 @@ func (p *AlFolioPublisher) generateSlugFromFilename(filename string) string {
 		return slug
 	}
 	return filename
+}
+
+func (p *AlFolioPublisher) runPrettier(ctx context.Context) error {
+	// Get the repository path
+	repoPath := p.repository.GetLocalPath()
+	
+	// Create the command to run prettier
+	cmd := exec.CommandContext(ctx, "npx", "prettier", "--write", ".")
+	cmd.Dir = repoPath
+	
+	// Run the command
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("prettier command failed: %w, output: %s", err, string(output))
+	}
+	
+	p.logger.Info("Prettier formatting completed",
+		zap.String("output", string(output)))
+	
+	return nil
 }
