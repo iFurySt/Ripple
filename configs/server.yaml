@@ -36,3 +36,21 @@ notion:
 scheduler:
   sync_interval: "${SYNC_INTERVAL:30m}"
   enabled: ${SCHEDULER_ENABLED:true}
+
+publisher:
+  al_folio:
+    enabled: ${AL_FOLIO_ENABLED:false}
+    repo_url: "${AL_FOLIO_REPO_URL:https://github.com/iFurySt/ifuryst.github.io}"
+    branch: "${AL_FOLIO_BRANCH:master}"
+    workspace_dir: "${AL_FOLIO_WORKSPACE:workplace}"
+    base_url: "${AL_FOLIO_BASE_URL:https://ifuryst.github.io}"
+    commit_message: "${AL_FOLIO_COMMIT_MESSAGE:Add new post via Ripple}"
+    auto_publish: ${AL_FOLIO_AUTO_PUBLISH:false}
+  wechat_official:
+    enabled: ${WECHAT_OFFICIAL_ENABLED:false}
+    app_id: "${WECHAT_OFFICIAL_APP_ID:}"
+    app_secret: "${WECHAT_OFFICIAL_APP_SECRET:}"
+    auto_publish: ${WECHAT_OFFICIAL_AUTO_PUBLISH:false}
+    need_open_comment: ${WECHAT_OFFICIAL_NEED_OPEN_COMMENT:0}
+    only_fans_can_comment: ${WECHAT_OFFICIAL_ONLY_FANS_CAN_COMMENT:0}
+    default_thumb_media_id: "${WECHAT_OFFICIAL_DEFAULT_THUMB_MEDIA_ID:}"

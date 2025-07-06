@@ -1,8 +1,8 @@
 package config
 
 import (
-	yamlenv "github.com/ifuryst/go-yaml-env"
 	"github.com/ifuryst/ripple/pkg/logger"
+	"time"
 )
 
 type Config struct {
@@ -11,6 +11,7 @@ type Config struct {
 	Logger    logger.Config   `yaml:"logger"`
 	Notion    NotionConfig    `yaml:"notion"`
 	Scheduler SchedulerConfig `yaml:"scheduler"`
+	Publisher PublisherConfig `yaml:"publisher"`
 }
 
 type ServerConfig struct {
@@ -39,50 +40,31 @@ type NotionConfig struct {
 }
 
 type SchedulerConfig struct {
-	SyncInterval string `yaml:"sync_interval"`
-	Enabled      bool   `yaml:"enabled"`
+	SyncInterval time.Duration `yaml:"sync_interval"`
+	Enabled      bool          `yaml:"enabled"`
 }
 
-func LoadConfig(configPath string) (*Config, error) {
-	cfg, err := yamlenv.LoadConfig[Config](configPath)
-	if err != nil {
-		return nil, err
-	}
+type PublisherConfig struct {
+	AlFolio        AlFolioConfig        `yaml:"al_folio"`
+	WeChatOfficial WeChatOfficialConfig `yaml:"wechat_official"`
+}
 
-	// Set default values
-	if cfg.Server.Host == "" {
-		cfg.Server.Host = "localhost"
-	}
-	if cfg.Server.Port == 0 {
-		cfg.Server.Port = 5334
-	}
-	if cfg.Server.Mode == "" {
-		cfg.Server.Mode = "debug"
-	}
-	if cfg.Database.Type == "" {
-		cfg.Database.Type = "postgres"
-	}
-	if cfg.Database.Host == "" {
-		cfg.Database.Host = "localhost"
-	}
-	if cfg.Database.Port == 0 {
-		cfg.Database.Port = 5432
-	}
-	if cfg.Database.SSLMode == "" {
-		cfg.Database.SSLMode = "disable"
-	}
-	if cfg.Database.TimeZone == "" {
-		cfg.Database.TimeZone = "UTC"
-	}
-	if cfg.Notion.APIVersion == "" {
-		cfg.Notion.APIVersion = "2022-06-28"
-	}
-	if cfg.Scheduler.SyncInterval == "" {
-		cfg.Scheduler.SyncInterval = "30m"
-	}
-	if !cfg.Scheduler.Enabled {
-		cfg.Scheduler.Enabled = true
-	}
+type AlFolioConfig struct {
+	Enabled       bool   `yaml:"enabled"`
+	RepoURL       string `yaml:"repo_url"`
+	Branch        string `yaml:"branch"`
+	WorkspaceDir  string `yaml:"workspace_dir"`
+	BaseURL       string `yaml:"base_url"`
+	CommitMessage string `yaml:"commit_message"`
+	AutoPublish   bool   `yaml:"auto_publish"`
+}
 
-	return cfg, nil
+type WeChatOfficialConfig struct {
+	Enabled            bool   `yaml:"enabled"`
+	AppID              string `yaml:"app_id"`
+	AppSecret          string `yaml:"app_secret"`
+	AutoPublish        bool   `yaml:"auto_publish"`
+	NeedOpenComment    int    `yaml:"need_open_comment"`
+	OnlyFansCanComment int    `yaml:"only_fans_can_comment"`
+	DefaultThumbMediaID string `yaml:"default_thumb_media_id"`
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	yamlenv "github.com/ifuryst/go-yaml-env"
 	"os"
 	"os/signal"
 	"syscall"
@@ -44,9 +45,9 @@ func init() {
 	rootCmd.AddCommand(versionCmd)
 }
 
-func runServer(cmd *cobra.Command, args []string) error {
+func runServer(*cobra.Command, []string) error {
 	// Load configuration
-	cfg, err := config.LoadConfig(configPath)
+	cfg, err := yamlenv.LoadConfig[config.Config](configPath)
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}

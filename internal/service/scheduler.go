@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"github.com/ifuryst/ripple/internal/service/notion"
 	"time"
 
 	"go.uber.org/zap"
@@ -10,19 +11,21 @@ import (
 )
 
 type Scheduler struct {
-	config        *config.SchedulerConfig
-	logger        *zap.Logger
-	notionService *NotionService
-	ticker        *time.Ticker
-	stopCh        chan struct{}
+	config           *config.SchedulerConfig
+	logger           *zap.Logger
+	notionService    *notion.Service
+	publisherService *PublisherService
+	ticker           *time.Ticker
+	stopCh           chan struct{}
 }
 
-func NewScheduler(cfg *config.SchedulerConfig, logger *zap.Logger, notionService *NotionService) *Scheduler {
+func NewScheduler(cfg *config.SchedulerConfig, logger *zap.Logger, notionService *notion.Service, publisherService *PublisherService) *Scheduler {
 	return &Scheduler{
-		config:        cfg,
-		logger:        logger,
-		notionService: notionService,
-		stopCh:        make(chan struct{}),
+		config:           cfg,
+		logger:           logger,
+		notionService:    notionService,
+		publisherService: publisherService,
+		stopCh:           make(chan struct{}),
 	}
 }
 
@@ -32,15 +35,9 @@ func (s *Scheduler) Start(ctx context.Context) error {
 		return nil
 	}
 
-	interval, err := time.ParseDuration(s.config.SyncInterval)
-	if err != nil {
-		s.logger.Error("Invalid sync interval", zap.String("interval", s.config.SyncInterval), zap.Error(err))
-		return err
-	}
+	s.logger.Info("Starting scheduler", zap.String("sync_interval", s.config.SyncInterval.String()))
 
-	s.logger.Info("Starting scheduler", zap.String("sync_interval", s.config.SyncInterval))
-
-	s.ticker = time.NewTicker(interval)
+	s.ticker = time.NewTicker(s.config.SyncInterval)
 
 	// Run first sync immediately
 	go func() {
@@ -82,17 +79,40 @@ func (s *Scheduler) Stop() {
 
 func (s *Scheduler) runSync() error {
 	start := time.Now()
-	err := s.notionService.SyncPages()
-	duration := time.Since(start)
 
+	// First sync pages from Notion
+	err := s.notionService.SyncPages()
 	if err != nil {
-		s.logger.Error("Sync failed", 
-			zap.Error(err), 
-			zap.Duration("duration", duration))
+		syncDuration := time.Since(start)
+		s.logger.Error("Notion sync failed",
+			zap.Error(err),
+			zap.Duration("sync_duration", syncDuration))
 		return err
 	}
 
-	s.logger.Info("Sync completed successfully", 
-		zap.Duration("duration", duration))
+	syncDuration := time.Since(start)
+	s.logger.Info("Notion sync completed successfully",
+		zap.Duration("sync_duration", syncDuration))
+
+	// Then process pending pages for publishing
+	publishStart := time.Now()
+	if s.publisherService != nil {
+		err = s.publisherService.ProcessPendingPages(context.Background())
+		publishDuration := time.Since(publishStart)
+
+		if err != nil {
+			s.logger.Error("Publishing pending pages failed",
+				zap.Error(err),
+				zap.Duration("publish_duration", publishDuration))
+			// Don't return error here - sync was successful, just publishing failed
+		} else {
+			s.logger.Info("Publishing pending pages completed successfully",
+				zap.Duration("publish_duration", publishDuration))
+		}
+	}
+
+	totalDuration := time.Since(start)
+	s.logger.Info("Full sync and publish cycle completed",
+		zap.Duration("total_duration", totalDuration))
 	return nil
 }
