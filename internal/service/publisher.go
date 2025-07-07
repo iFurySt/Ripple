@@ -11,6 +11,7 @@ import (
 	"github.com/ifuryst/ripple/internal/models"
 	"github.com/ifuryst/ripple/internal/service/publisher"
 	"github.com/ifuryst/ripple/internal/service/publisher/al_folio"
+	"github.com/ifuryst/ripple/internal/service/publisher/substack"
 	"github.com/ifuryst/ripple/internal/service/publisher/wechat_official"
 )
 
@@ -82,6 +83,27 @@ func (s *PublisherService) registerPublishers() {
 			}
 			s.manager.SetPlatformConfig("wechat-official", cfg)
 			s.logger.Info("WeChat Official Account publisher registered and configured")
+		}
+	}
+
+	// Register Substack Publisher
+	if s.config.Publisher.Substack.Enabled {
+		substackPublisher := substack.NewSubstackPublisher(s.logger)
+		if err := s.manager.RegisterPublisher(substackPublisher); err != nil {
+			s.logger.Error("Failed to register Substack publisher", zap.Error(err))
+		} else {
+			// Set platform configuration
+			cfg := publisher.PublishConfig{
+				PlatformName: "substack",
+				Enabled:      s.config.Publisher.Substack.Enabled,
+				Config: map[string]string{
+					"domain":       s.config.Publisher.Substack.Domain,
+					"cookie":       s.config.Publisher.Substack.Cookie,
+					"auto_publish": fmt.Sprintf("%t", s.config.Publisher.Substack.AutoPublish),
+				},
+			}
+			s.manager.SetPlatformConfig("substack", cfg)
+			s.logger.Info("Substack publisher registered and configured")
 		}
 	}
 }

@@ -47,6 +47,7 @@ type SchedulerConfig struct {
 type PublisherConfig struct {
 	AlFolio        AlFolioConfig        `yaml:"al_folio"`
 	WeChatOfficial WeChatOfficialConfig `yaml:"wechat_official"`
+	Substack       SubstackConfig       `yaml:"substack"`
 }
 
 type AlFolioConfig struct {
@@ -67,4 +68,11 @@ type WeChatOfficialConfig struct {
 	NeedOpenComment    int    `yaml:"need_open_comment"`
 	OnlyFansCanComment int    `yaml:"only_fans_can_comment"`
 	DefaultThumbMediaID string `yaml:"default_thumb_media_id"`
+}
+
+type SubstackConfig struct {
+	Enabled     bool   `yaml:"enabled"`
+	Domain      string `yaml:"domain"`
+	Cookie      string `yaml:"cookie"`
+	AutoPublish bool   `yaml:"auto_publish"`
 }

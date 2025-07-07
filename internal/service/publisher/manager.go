@@ -373,6 +373,8 @@ func (m *Manager) mapPlatformName(notionPlatform string) string {
 		"微信公众号": "wechat-official",
 		"WeChat":     "wechat-official",
 		"wechat":     "wechat-official",
+		"Substack":   "substack",
+		"substack":   "substack",
 		// Direct matches (already using system names)
 		"al-folio":     "al-folio",
 		"wechat-official": "wechat-official",

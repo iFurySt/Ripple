@@ -54,3 +54,8 @@ publisher:
     need_open_comment: ${WECHAT_OFFICIAL_NEED_OPEN_COMMENT:0}
     only_fans_can_comment: ${WECHAT_OFFICIAL_ONLY_FANS_CAN_COMMENT:0}
     default_thumb_media_id: "${WECHAT_OFFICIAL_DEFAULT_THUMB_MEDIA_ID:}"
+  substack:
+    enabled: ${SUBSTACK_ENABLED:false}
+    domain: "${SUBSTACK_DOMAIN:}"
+    cookie: "${SUBSTACK_COOKIE:}"
+    auto_publish: ${SUBSTACK_AUTO_PUBLISH:false}

@@ -2,6 +2,7 @@ package logger
 
 import (
 	"os"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -56,7 +57,7 @@ func NewLogger(cfg Config) (*zap.Logger, error) {
 		EncodeLevel:    zapcore.LowercaseLevelEncoder,
 		EncodeTime:     customTimeEncoder(cfg.TimeFormat, cfg.Timezone),
 		EncodeDuration: zapcore.SecondsDurationEncoder,
-		EncodeCaller:   zapcore.ShortCallerEncoder,
+		EncodeCaller:   customCallerEncoder,
 	}
 
 	// Create encoder
@@ -97,7 +98,7 @@ func NewLogger(cfg Config) (*zap.Logger, error) {
 	)
 
 	// Create logger
-	logger := zap.New(core, zap.AddCaller(), zap.AddCallerSkip(1))
+	logger := zap.New(core, zap.AddCaller())
 
 	return logger, nil
 }
@@ -118,4 +119,22 @@ func customTimeEncoder(format, timezone string) zapcore.TimeEncoder {
 
 		enc.AppendString(t.In(loc).Format(format))
 	}
+}
+
+func customCallerEncoder(caller zapcore.EntryCaller, enc zapcore.PrimitiveArrayEncoder) {
+	// Get the full path and extract relevant parts
+	fullPath := caller.FullPath()
+	
+	// Try to extract the most relevant part of the path
+	if strings.Contains(fullPath, "/ripple/") {
+		// Find the project root and show path from there
+		parts := strings.Split(fullPath, "/ripple/")
+		if len(parts) > 1 {
+			enc.AppendString(parts[len(parts)-1])
+			return
+		}
+	}
+	
+	// Fallback to short caller if our custom logic doesn't work
+	enc.AppendString(caller.TrimmedPath())
 }

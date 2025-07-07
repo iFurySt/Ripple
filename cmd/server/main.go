@@ -3,11 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	yamlenv "github.com/ifuryst/go-yaml-env"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
+	yamlenv "github.com/ifuryst/go-yaml-env"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 
@@ -73,7 +74,10 @@ func runServer(*cobra.Command, []string) error {
 
 	go func() {
 		if err := srv.Start(ctx); err != nil {
-			appLogger.Error("Server failed to start", zap.Error(err))
+			// Don't log "Server closed" as an error - it's expected during graceful shutdown
+			if err != http.ErrServerClosed {
+				appLogger.Error("Server failed to start", zap.Error(err))
+			}
 			cancel()
 		}
 	}()

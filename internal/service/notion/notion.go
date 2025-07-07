@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -150,8 +151,11 @@ func (s *Service) processPage(page PageResponse) error {
 
 		s.logger.Info("Created new page", zap.String("page_id", page.ID), zap.String("title", title))
 	} else {
-		// Update existing page if modified
-		if existingPage.LastModified.Before(lastModified) {
+		// Check if we need to force refresh content (for image link expiration)
+		needsContentRefresh := s.shouldRefreshContent(existingPage)
+		
+		// Update existing page if modified or needs content refresh
+		if existingPage.LastModified.Before(lastModified) || needsContentRefresh {
 			existingPage.Title = title
 			existingPage.ENTitle = enTitle
 			existingPage.Content = content
@@ -168,11 +172,49 @@ func (s *Service) processPage(page PageResponse) error {
 				return fmt.Errorf("failed to update page: %w", err)
 			}
 
-			s.logger.Info("Updated existing page", zap.String("page_id", page.ID), zap.String("title", title))
+			if needsContentRefresh {
+				s.logger.Info("Force refreshed page content", zap.String("page_id", page.ID), zap.String("title", title), zap.String("reason", "content_refresh"))
+			} else {
+				s.logger.Info("Updated existing page", zap.String("page_id", page.ID), zap.String("title", title))
+			}
 		}
 	}
 
 	return nil
+}
+
+func (s *Service) shouldRefreshContent(existingPage models.NotionPage) bool {
+	// Force refresh if content is older than 4 hours (image links typically expire in 1-24 hours)
+	refreshThreshold := time.Now().Add(-4 * time.Hour)
+	
+	// Check if page was last updated more than 4 hours ago
+	if existingPage.UpdatedAt.Before(refreshThreshold) {
+		// Check if content contains AWS image URLs that might expire
+		if s.containsAWSImageURLs(existingPage.Content) {
+			return true
+		}
+	}
+	
+	return false
+}
+
+func (s *Service) containsAWSImageURLs(content string) bool {
+	// Check for AWS S3 URLs in content that are commonly used by Notion
+	awsPatterns := []string{
+		"s3.us-west-2.amazonaws.com",
+		"prod-files-secure.s3.us-west-2.amazonaws.com",
+		"amazonaws.com",
+		"?X-Amz-Algorithm=",
+		"?X-Amz-Credential=",
+	}
+	
+	for _, pattern := range awsPatterns {
+		if strings.Contains(content, pattern) {
+			return true
+		}
+	}
+	
+	return false
 }
 
 func (s *Service) getPageContent(pageID string) (string, error) {
