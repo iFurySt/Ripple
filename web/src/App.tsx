@@ -56,7 +56,7 @@ function AuthWrapper() {
       const authToken = document.cookie
         .split('; ')
         .find(row => row.startsWith('auth_token='));
-      
+
       setIsAuthenticated(!!authToken);
       setIsLoading(false);
     };
@@ -69,16 +69,6 @@ function AuthWrapper() {
     // Redirect to original destination or dashboard
     const redirectTo = location.pathname === '/login' ? '/overview' : location.pathname;
     window.location.href = redirectTo;
-  };
-
-  const handleLogout = async () => {
-    try {
-      await fetch('/api/v1/auth/logout', { method: 'POST' });
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-    setIsAuthenticated(false);
-    window.location.href = '/login';
   };
 
   if (isLoading) {
