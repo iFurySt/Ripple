@@ -99,8 +99,9 @@ func (m *Manager) PublishToPlatforms(ctx context.Context, page *models.NotionPag
 				zap.String("platform", platformName),
 				zap.Error(err))
 			results[platformName] = &PublishResult{
-				Success: false,
-				Error:   err,
+				Success:  false,
+				Error:    err,
+				ErrorMsg: err.Error(),
 			}
 			continue
 		}
@@ -111,8 +112,9 @@ func (m *Manager) PublishToPlatforms(ctx context.Context, page *models.NotionPag
 				zap.String("platform", platformName),
 				zap.Error(err))
 			results[platformName] = &PublishResult{
-				Success: false,
-				Error:   err,
+				Success:  false,
+				Error:    err,
+				ErrorMsg: err.Error(),
 			}
 			continue
 		}
@@ -121,9 +123,11 @@ func (m *Manager) PublishToPlatforms(ctx context.Context, page *models.NotionPag
 		if !config.Enabled {
 			m.logger.Info("Platform disabled, skipping",
 				zap.String("platform", platformName))
+			err := fmt.Errorf("platform %s is disabled", platformName)
 			results[platformName] = &PublishResult{
-				Success: false,
-				Error:   fmt.Errorf("platform %s is disabled", platformName),
+				Success:  false,
+				Error:    err,
+				ErrorMsg: err.Error(),
 			}
 			continue
 		}
@@ -133,9 +137,11 @@ func (m *Manager) PublishToPlatforms(ctx context.Context, page *models.NotionPag
 		if platformID == 0 {
 			m.logger.Error("Failed to get platform ID",
 				zap.String("platform", platformName))
+			err := fmt.Errorf("failed to get platform ID for %s", platformName)
 			results[platformName] = &PublishResult{
-				Success: false,
-				Error:   fmt.Errorf("failed to get platform ID for %s", platformName),
+				Success:  false,
+				Error:    err,
+				ErrorMsg: err.Error(),
 			}
 			continue
 		}
@@ -177,8 +183,9 @@ func (m *Manager) PublishToPlatforms(ctx context.Context, page *models.NotionPag
 
 			m.updateJobStatus(job, "failed", err.Error())
 			results[platformName] = &PublishResult{
-				Success: false,
-				Error:   err,
+				Success:  false,
+				Error:    err,
+				ErrorMsg: err.Error(),
 			}
 			continue
 		}
@@ -192,8 +199,9 @@ func (m *Manager) PublishToPlatforms(ctx context.Context, page *models.NotionPag
 
 			m.updateJobStatus(job, "failed", err.Error())
 			results[platformName] = &PublishResult{
-				Success: false,
-				Error:   err,
+				Success:  false,
+				Error:    err,
+				ErrorMsg: err.Error(),
 			}
 			continue
 		}
@@ -255,23 +263,27 @@ func (m *Manager) PublishSinglePlatform(ctx context.Context, page *models.Notion
 	publisher, err := m.GetPublisher(platformName)
 	if err != nil {
 		return &PublishResult{
-			Success: false,
-			Error:   err,
+			Success:  false,
+			Error:    err,
+			ErrorMsg: err.Error(),
 		}, nil
 	}
 
 	config, err := m.GetPlatformConfig(platformName)
 	if err != nil {
 		return &PublishResult{
-			Success: false,
-			Error:   err,
+			Success:  false,
+			Error:    err,
+			ErrorMsg: err.Error(),
 		}, nil
 	}
 
 	if !config.Enabled {
+		err := fmt.Errorf("platform %s is disabled", platformName)
 		return &PublishResult{
-			Success: false,
-			Error:   fmt.Errorf("platform %s is disabled", platformName),
+			Success:  false,
+			Error:    err,
+			ErrorMsg: err.Error(),
 		}, nil
 	}
 
@@ -280,8 +292,9 @@ func (m *Manager) PublishSinglePlatform(ctx context.Context, page *models.Notion
 	// Initialize publisher
 	if err := publisher.Initialize(ctx, config); err != nil {
 		return &PublishResult{
-			Success: false,
-			Error:   err,
+			Success:  false,
+			Error:    err,
+			ErrorMsg: err.Error(),
 		}, nil
 	}
 
@@ -289,16 +302,18 @@ func (m *Manager) PublishSinglePlatform(ctx context.Context, page *models.Notion
 	transformedContent, err := publisher.TransformContent(ctx, *content)
 	if err != nil {
 		return &PublishResult{
-			Success: false,
-			Error:   err,
+			Success:  false,
+			Error:    err,
+			ErrorMsg: err.Error(),
 		}, nil
 	}
 
 	// Process resources
 	if err := publisher.ProcessResources(ctx, transformedContent, config); err != nil {
 		return &PublishResult{
-			Success: false,
-			Error:   err,
+			Success:  false,
+			Error:    err,
+			ErrorMsg: err.Error(),
 		}, nil
 	}
 
@@ -314,8 +329,9 @@ func (m *Manager) PublishSinglePlatform(ctx context.Context, page *models.Notion
 
 	if err != nil {
 		return &PublishResult{
-			Success: false,
-			Error:   err,
+			Success:  false,
+			Error:    err,
+			ErrorMsg: err.Error(),
 		}, nil
 	}
 
@@ -331,9 +347,11 @@ func (m *Manager) PublishSinglePlatform(ctx context.Context, page *models.Notion
 	// Get platform ID
 	platformID := m.getPlatformID(platformName)
 	if platformID == 0 {
+		err := fmt.Errorf("failed to get platform ID for %s", platformName)
 		return &PublishResult{
-			Success: false,
-			Error:   fmt.Errorf("failed to get platform ID for %s", platformName),
+			Success:  false,
+			Error:    err,
+			ErrorMsg: err.Error(),
 		}, nil
 	}
 
@@ -350,6 +368,10 @@ func (m *Manager) PublishSinglePlatform(ctx context.Context, page *models.Notion
 
 	if result.Error != nil {
 		job.Error = result.Error.Error()
+		// Ensure ErrorMsg is set for JSON serialization
+		if result.ErrorMsg == "" {
+			result.ErrorMsg = result.Error.Error()
+		}
 	}
 
 	if err := m.db.Create(job).Error; err != nil {

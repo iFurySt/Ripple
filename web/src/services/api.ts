@@ -114,6 +114,12 @@ export const dashboardApi = {
     const response = await api.post<{ message: string }>(`/dashboard/resolve-error/${errorId}`)
     return response.data
   },
+
+  // Republish job
+  republishJob: async (jobId: number): Promise<{ message: string; result?: any }> => {
+    const response = await api.post<{ message: string; result?: any }>(`/dashboard/republish-job/${jobId}`)
+    return response.data
+  },
 }
 
 export default api

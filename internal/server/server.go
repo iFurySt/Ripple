@@ -177,6 +177,7 @@ func (s *Server) setupRoutes() {
 			dashboard.GET("/jobs", s.handleGetJobs)
 			dashboard.POST("/update-stats", s.handleUpdateStats)
 			dashboard.POST("/resolve-error/:errorId", s.handleResolveError)
+			dashboard.POST("/republish-job/:jobId", s.handleRepublishJob)
 		}
 	}
 }
@@ -547,5 +548,89 @@ func (s *Server) handleGetJobs(c *gin.Context) {
 		"total":  total,
 		"limit":  limit,
 		"offset": offset,
+	})
+}
+
+func (s *Server) handleRepublishJob(c *gin.Context) {
+	jobIDParam := c.Param("jobId")
+	jobID, err := strconv.ParseUint(jobIDParam, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid job ID"})
+		return
+	}
+
+	var job models.DistributionJob
+	err = s.DB.Preload("Page").Preload("Platform").First(&job, uint(jobID)).Error
+	if err != nil {
+		s.Logger.Error("Failed to find job", zap.Uint64("job_id", jobID), zap.Error(err))
+		c.JSON(http.StatusNotFound, gin.H{"error": "Job not found"})
+		return
+	}
+
+	if job.Page.NotionID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Job has no associated page"})
+		return
+	}
+
+	if job.Platform.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Job has no associated platform"})
+		return
+	}
+
+	s.Logger.Info("Manually republishing job", 
+		zap.Uint64("job_id", jobID), 
+		zap.String("page_id", job.Page.NotionID), 
+		zap.String("platform", job.Platform.Name),
+		zap.String("original_status", job.Status))
+
+	// Mark the existing job as "republish_requested" to trigger a new job creation
+	// This bypasses the "already completed" check in the publisher
+	originalStatus := job.Status
+	job.Status = "republish_requested"
+	job.Error = "" // Clear any previous error
+	if err := s.DB.Save(&job).Error; err != nil {
+		s.Logger.Error("Failed to update job status for republish",
+			zap.Uint64("job_id", jobID),
+			zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to prepare job for republish"})
+		return
+	}
+
+	s.Logger.Info("Job status updated for republish",
+		zap.Uint64("job_id", jobID),
+		zap.String("old_status", originalStatus),
+		zap.String("new_status", job.Status))
+
+	// Trigger immediate processing of pending pages to execute the republish
+	s.Logger.Info("Triggering immediate processing of pending pages for republish")
+	err = s.PublisherService.ProcessPendingPages(c.Request.Context())
+	if err != nil {
+		s.Logger.Error("Failed to process pending pages for republish",
+			zap.Uint64("job_id", jobID),
+			zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to process republish: %v", err)})
+		return
+	}
+
+	// Check the job status after processing
+	var updatedJob models.DistributionJob
+	if err := s.DB.Preload("Page").Preload("Platform").First(&updatedJob, jobID).Error; err != nil {
+		s.Logger.Error("Failed to get updated job status", zap.Uint64("job_id", jobID), zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get updated job status"})
+		return
+	}
+
+	s.Logger.Info("Republish processing completed",
+		zap.Uint64("job_id", jobID),
+		zap.String("final_status", updatedJob.Status))
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Job republished successfully",
+		"job": map[string]interface{}{
+			"id":           updatedJob.ID,
+			"status":       updatedJob.Status,
+			"error":        updatedJob.Error,
+			"published_at": updatedJob.PublishedAt,
+		},
 	})
 }

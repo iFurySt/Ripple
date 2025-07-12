@@ -164,16 +164,18 @@ func (p *AlFolioPublisher) SaveToDraft(ctx context.Context, content publisher.Pu
 	transformedContent, err := p.TransformContent(ctx, content)
 	if err != nil {
 		return &publisher.PublishResult{
-			Success: false,
-			Error:   err,
+			Success:  false,
+			Error:    err,
+			ErrorMsg: err.Error(),
 		}, nil
 	}
 
 	// Process resources (images)
 	if err := p.ProcessResources(ctx, transformedContent, config); err != nil {
 		return &publisher.PublishResult{
-			Success: false,
-			Error:   err,
+			Success:  false,
+			Error:    err,
+			ErrorMsg: err.Error(),
 		}, nil
 	}
 
@@ -289,16 +291,18 @@ func (p *AlFolioPublisher) PublishDirect(ctx context.Context, content publisher.
 	transformedContent, err := p.TransformContent(ctx, content)
 	if err != nil {
 		return &publisher.PublishResult{
-			Success: false,
-			Error:   err,
+			Success:  false,
+			Error:    err,
+			ErrorMsg: err.Error(),
 		}, nil
 	}
 
 	// Process resources (images)
 	if err := p.ProcessResources(ctx, transformedContent, config); err != nil {
 		return &publisher.PublishResult{
-			Success: false,
-			Error:   err,
+			Success:  false,
+			Error:    err,
+			ErrorMsg: err.Error(),
 		}, nil
 	}
 
@@ -307,8 +311,9 @@ func (p *AlFolioPublisher) PublishDirect(ctx context.Context, content publisher.
 	writeResult, err := p.writePostFile(ctx, *transformedContent, filename, false)
 	if err != nil {
 		return &publisher.PublishResult{
-			Success: false,
-			Error:   err,
+			Success:  false,
+			Error:    err,
+			ErrorMsg: err.Error(),
 		}, nil
 	}
 
@@ -316,8 +321,9 @@ func (p *AlFolioPublisher) PublishDirect(ctx context.Context, content publisher.
 	publishResult, err := p.Publish(ctx, writeResult.PublishID, config)
 	if err != nil {
 		return &publisher.PublishResult{
-			Success: false,
-			Error:   err,
+			Success:  false,
+			Error:    err,
+			ErrorMsg: err.Error(),
 		}, nil
 	}
 
@@ -327,10 +333,12 @@ func (p *AlFolioPublisher) PublishDirect(ctx context.Context, content publisher.
 func (p *AlFolioPublisher) GetPublishStatus(ctx context.Context, publishID string, config publisher.PublishConfig) (*publisher.PublishResult, error) {
 	// Check if the file exists in the repository
 	if !p.repository.FileExists(filepath.Join("_posts", publishID)) {
+		err := fmt.Errorf("post file not found: %s", publishID)
 		return &publisher.PublishResult{
 			Success:   false,
 			PublishID: publishID,
-			Error:     fmt.Errorf("post file not found: %s", publishID),
+			Error:     err,
+			ErrorMsg:  err.Error(),
 		}, nil
 	}
 

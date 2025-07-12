@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { FileText, Send, ChevronLeft, ChevronRight, Filter } from 'lucide-react'
+import { FileText, Send, ChevronLeft, ChevronRight, Filter, RefreshCw } from 'lucide-react'
 import { dashboardApi } from '@/services/api'
 import { formatDate, formatNumber } from '@/lib/utils'
 import { ErrorDisplay } from '@/components/ErrorDisplay'
@@ -31,6 +31,7 @@ export function DetailedListDialog({ open, onOpenChange, type, title }: Detailed
   const [currentPage, setCurrentPage] = useState(0)
   const [totalJobs, setTotalJobs] = useState(0)
   const [jobStatus, setJobStatus] = useState<string>('')
+  const [republishingJobs, setRepublishingJobs] = useState<Set<number>>(new Set())
   const limit = 20
 
   const fetchData = async () => {
@@ -74,6 +75,23 @@ export function DetailedListDialog({ open, onOpenChange, type, title }: Detailed
     const maxPage = Math.ceil(totalJobs / limit) - 1
     if (currentPage < maxPage) {
       setCurrentPage(currentPage + 1)
+    }
+  }
+
+  const handleRepublish = async (jobId: number) => {
+    try {
+      setRepublishingJobs(prev => new Set(prev).add(jobId))
+      await dashboardApi.republishJob(jobId)
+      await fetchData() // Refresh the jobs list
+    } catch (err) {
+      console.error('Error republishing job:', err)
+      setError('Failed to republish job')
+    } finally {
+      setRepublishingJobs(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(jobId)
+        return newSet
+      })
     }
   }
 
@@ -186,9 +204,21 @@ export function DetailedListDialog({ open, onOpenChange, type, title }: Detailed
                 <h4 className="font-medium">
                   {job.page?.title || `Job #${job.id}`}
                 </h4>
-                <Badge variant={getStatusColor(job.status)}>
-                  {job.status}
-                </Badge>
+                <div className="flex items-center space-x-2">
+                  <Badge variant={getStatusColor(job.status)}>
+                    {job.status}
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleRepublish(job.id)}
+                    disabled={republishingJobs.has(job.id)}
+                    className="h-6 px-2 text-xs"
+                  >
+                    <RefreshCw className={`h-3 w-3 mr-1 ${republishingJobs.has(job.id) ? 'animate-spin' : ''}`} />
+                    {republishingJobs.has(job.id) ? 'Publishing...' : 'Republish'}
+                  </Button>
+                </div>
               </div>
               <div className="text-sm text-muted-foreground space-y-1">
                 <p>Platform: {job.platform?.display_name || job.platform?.name || 'Unknown'}</p>

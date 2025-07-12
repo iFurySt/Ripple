@@ -227,6 +227,7 @@ func (s *PublisherService) PublishPageToPlatform(ctx context.Context, pageID str
 	return result, nil
 }
 
+
 // SavePageToDraft saves a page as draft to a specific platform
 func (s *PublisherService) SavePageToDraft(ctx context.Context, pageID string, platformName string) (*publisher.PublishResult, error) {
 	// Get the page from database

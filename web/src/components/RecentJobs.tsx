@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Send, ExternalLink, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { Send, ExternalLink, Clock, CheckCircle, XCircle, AlertCircle, RefreshCw } from 'lucide-react'
 import { dashboardApi } from '@/services/api'
 import { formatDate } from '@/lib/utils'
 import { ErrorDisplay } from '@/components/ErrorDisplay'
@@ -19,6 +19,7 @@ export function RecentJobs({ limit = 5, showHeader = true, onViewAll, statusFilt
   const [jobs, setJobs] = useState<DistributionJob[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [republishingJobs, setRepublishingJobs] = useState<Set<number>>(new Set())
 
   const fetchJobs = async () => {
     try {
@@ -41,6 +42,23 @@ export function RecentJobs({ limit = 5, showHeader = true, onViewAll, statusFilt
   useEffect(() => {
     fetchJobs()
   }, [limit, statusFilter])
+
+  const handleRepublish = async (jobId: number) => {
+    try {
+      setRepublishingJobs(prev => new Set(prev).add(jobId))
+      await dashboardApi.republishJob(jobId)
+      await fetchJobs() // Refresh the jobs list
+    } catch (err) {
+      console.error('Error republishing job:', err)
+      setError('Failed to republish job')
+    } finally {
+      setRepublishingJobs(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(jobId)
+        return newSet
+      })
+    }
+  }
 
   const getStatusIcon = (status: string) => {
     switch (status.toLowerCase()) {
@@ -177,6 +195,18 @@ export function RecentJobs({ limit = 5, showHeader = true, onViewAll, statusFilt
                   )}
                 </div>
                 <div className="flex flex-col items-end space-y-1">
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleRepublish(job.id)}
+                      disabled={republishingJobs.has(job.id)}
+                      className="h-6 px-2 text-xs"
+                    >
+                      <RefreshCw className={`h-3 w-3 mr-1 ${republishingJobs.has(job.id) ? 'animate-spin' : ''}`} />
+                      {republishingJobs.has(job.id) ? 'Publishing...' : 'Republish'}
+                    </Button>
+                  </div>
                   <span className="text-xs text-muted-foreground">
                     Job #{job.id}
                   </span>

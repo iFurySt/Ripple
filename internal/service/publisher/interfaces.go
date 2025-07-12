@@ -44,7 +44,8 @@ type PublishResult struct {
 	Success     bool              `json:"success"`
 	PublishID   string            `json:"publish_id,omitempty"`
 	URL         string            `json:"url,omitempty"`
-	Error       error             `json:"error,omitempty"`
+	Error       error             `json:"-"` // Don't serialize error directly
+	ErrorMsg    string            `json:"error,omitempty"` // Serialize error message as string
 	Metadata    map[string]string `json:"metadata,omitempty"`
 	PublishedAt time.Time         `json:"published_at"`
 }

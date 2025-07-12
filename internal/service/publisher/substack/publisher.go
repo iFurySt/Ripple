@@ -227,8 +227,9 @@ func (p *SubstackPublisher) SaveToDraft(ctx context.Context, content publisher.P
 	if err != nil {
 		p.logger.Error("Failed to transform content", zap.Error(err))
 		return &publisher.PublishResult{
-			Success: false,
-			Error:   err,
+			Success:  false,
+			Error:    err,
+			ErrorMsg: err.Error(),
 		}, nil
 	}
 	
@@ -255,9 +256,11 @@ func (p *SubstackPublisher) SaveToDraft(ctx context.Context, content publisher.P
 	// Create draft
 	draftResponse, err := p.createDraft(ctx, draftRequest)
 	if err != nil {
+		draftErr := fmt.Errorf("failed to create Substack draft: %w", err)
 		return &publisher.PublishResult{
-			Success: false,
-			Error:   fmt.Errorf("failed to create Substack draft: %w", err),
+			Success:  false,
+			Error:    draftErr,
+			ErrorMsg: draftErr.Error(),
 		}, nil
 	}
 
@@ -271,9 +274,11 @@ func (p *SubstackPublisher) SaveToDraft(ctx context.Context, content publisher.P
 		
 	if err := p.ProcessResources(ctx, transformedContent, config); err != nil {
 		p.logger.Error("Failed to process resources", zap.Error(err))
+		resourceErr := fmt.Errorf("failed to process resources: %w", err)
 		return &publisher.PublishResult{
-			Success: false,
-			Error:   fmt.Errorf("failed to process resources: %w", err),
+			Success:  false,
+			Error:    resourceErr,
+			ErrorMsg: resourceErr.Error(),
 		}, nil
 	}
 	
@@ -336,8 +341,9 @@ func (p *SubstackPublisher) PublishDirect(ctx context.Context, content publisher
 	draftResult, err := p.SaveToDraft(ctx, content, config)
 	if err != nil {
 		return &publisher.PublishResult{
-			Success: false,
-			Error:   err,
+			Success:  false,
+			Error:    err,
+			ErrorMsg: err.Error(),
 		}, nil
 	}
 

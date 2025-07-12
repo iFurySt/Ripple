@@ -187,16 +187,20 @@ func (p *WeChatOfficialPublisher) ProcessResources(ctx context.Context, content 
 func (p *WeChatOfficialPublisher) SaveToDraft(ctx context.Context, content publisher.PublishContent, config publisher.PublishConfig) (*publisher.PublishResult, error) {
 	// Validate content before creating draft
 	if content.Title == "" {
+		titleErr := fmt.Errorf("article title is required")
 		return &publisher.PublishResult{
-			Success: false,
-			Error:   fmt.Errorf("article title is required"),
+			Success:  false,
+			Error:    titleErr,
+			ErrorMsg: titleErr.Error(),
 		}, nil
 	}
 
 	if content.Content == "" {
+		contentErr := fmt.Errorf("article content is required")
 		return &publisher.PublishResult{
-			Success: false,
-			Error:   fmt.Errorf("article content is required"),
+			Success:  false,
+			Error:    contentErr,
+			ErrorMsg: contentErr.Error(),
 		}, nil
 	}
 
@@ -234,9 +238,11 @@ func (p *WeChatOfficialPublisher) SaveToDraft(ctx context.Context, content publi
 	// Call WeChat API to add draft
 	mediaID, err := p.addDraft(draftRequest, config)
 	if err != nil {
+		draftErr := fmt.Errorf("failed to create WeChat draft: %w", err)
 		return &publisher.PublishResult{
-			Success: false,
-			Error:   fmt.Errorf("failed to create WeChat draft: %w", err),
+			Success:  false,
+			Error:    draftErr,
+			ErrorMsg: draftErr.Error(),
 		}, nil
 	}
 
@@ -264,8 +270,9 @@ func (p *WeChatOfficialPublisher) Publish(ctx context.Context, draftID string, c
 	publishResponse, err := p.publishDraft(publishRequest, config)
 	if err != nil {
 		return &publisher.PublishResult{
-			Success: false,
-			Error:   err,
+			Success:  false,
+			Error:    err,
+			ErrorMsg: err.Error(),
 		}, nil
 	}
 
@@ -288,35 +295,43 @@ func (p *WeChatOfficialPublisher) Publish(ctx context.Context, draftID string, c
 func (p *WeChatOfficialPublisher) PublishDirect(ctx context.Context, content publisher.PublishContent, config publisher.PublishConfig) (*publisher.PublishResult, error) {
 	// Stage 1: Initialize - validate access token
 	if p.accessToken == "" {
+		tokenErr := fmt.Errorf("WeChat publisher not initialized - access token missing")
 		return &publisher.PublishResult{
-			Success: false,
-			Error:   fmt.Errorf("WeChat publisher not initialized - access token missing"),
+			Success:  false,
+			Error:    tokenErr,
+			ErrorMsg: tokenErr.Error(),
 		}, nil
 	}
 
 	// Stage 2: Transform content first (before processing media)
 	transformedContent, err := p.TransformContent(ctx, content)
 	if err != nil {
+		transformErr := fmt.Errorf("content transformation failed: %w", err)
 		return &publisher.PublishResult{
-			Success: false,
-			Error:   fmt.Errorf("content transformation failed: %w", err),
+			Success:  false,
+			Error:    transformErr,
+			ErrorMsg: transformErr.Error(),
 		}, nil
 	}
 
 	// Stage 3: Process media resources (upload images to WeChat)
 	if err := p.ProcessResources(ctx, transformedContent, config); err != nil {
+		mediaErr := fmt.Errorf("media processing failed: %w", err)
 		return &publisher.PublishResult{
-			Success: false,
-			Error:   fmt.Errorf("media processing failed: %w", err),
+			Success:  false,
+			Error:    mediaErr,
+			ErrorMsg: mediaErr.Error(),
 		}, nil
 	}
 
 	// Stage 4: Save to draft
 	draftResult, err := p.SaveToDraft(ctx, *transformedContent, config)
 	if err != nil {
+		draftCreationErr := fmt.Errorf("draft creation failed: %w", err)
 		return &publisher.PublishResult{
-			Success: false,
-			Error:   fmt.Errorf("draft creation failed: %w", err),
+			Success:  false,
+			Error:    draftCreationErr,
+			ErrorMsg: draftCreationErr.Error(),
 		}, nil
 	}
 
@@ -368,10 +383,12 @@ func (p *WeChatOfficialPublisher) GetPublishStatus(ctx context.Context, publishI
 	}
 
 	success := statusResp.ErrCode == 0
+	statusErr := fmt.Errorf("WeChat API error: %s", statusResp.ErrMsg)
 	return &publisher.PublishResult{
 		Success:   success,
 		PublishID: publishID,
-		Error:     fmt.Errorf("WeChat API error: %s", statusResp.ErrMsg),
+		Error:     statusErr,
+		ErrorMsg:  statusErr.Error(),
 	}, nil
 }
 
