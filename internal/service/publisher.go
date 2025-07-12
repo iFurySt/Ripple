@@ -17,18 +17,20 @@ import (
 
 // PublisherService manages content publishing to various platforms
 type PublisherService struct {
-	logger  *zap.Logger
-	db      *gorm.DB
-	config  *config.Config
-	manager *publisher.Manager
+	logger             *zap.Logger
+	db                 *gorm.DB
+	config             *config.Config
+	manager            *publisher.Manager
+	monitoringService  *MonitoringService
 }
 
 func NewPublisherService(cfg *config.Config, db *gorm.DB, logger *zap.Logger) *PublisherService {
 	service := &PublisherService{
-		logger:  logger,
-		db:      db,
-		config:  cfg,
-		manager: publisher.NewPublishManager(logger, db),
+		logger:            logger,
+		db:                db,
+		config:            cfg,
+		manager:           publisher.NewPublishManager(logger, db),
+		monitoringService: NewMonitoringService(db, logger),
 	}
 
 	// Register publishers
@@ -129,7 +131,40 @@ func (s *PublisherService) PublishPage(ctx context.Context, pageID string) (map[
 	// Publish to all platforms
 	results, err := s.manager.PublishToAll(ctx, &page)
 	if err != nil {
+		// Record error in monitoring
+		s.monitoringService.RecordError("ERROR", "publisher", "Failed to publish page to all platforms", err.Error(),
+			WithPage(page.ID),
+			WithContext(map[string]interface{}{
+				"page_id":   pageID,
+				"title":     page.Title,
+				"platforms": page.Platforms,
+			}))
 		return nil, fmt.Errorf("failed to publish page: %w", err)
+	}
+
+	// Record metrics for each platform
+	for platformName, result := range results {
+		if result.Success {
+			s.monitoringService.RecordMetric("publish_success", "counter", 1, map[string]interface{}{
+				"platform": platformName,
+				"page_id":  pageID,
+			})
+		} else {
+			s.monitoringService.RecordMetric("publish_failure", "counter", 1, map[string]interface{}{
+				"platform": platformName,
+				"page_id":  pageID,
+			})
+			// Record specific error
+			if result.Error != nil {
+				s.monitoringService.RecordError("ERROR", "publisher", fmt.Sprintf("Failed to publish to %s", platformName), result.Error.Error(),
+					WithPlatform(platformName),
+					WithPage(page.ID),
+					WithContext(map[string]interface{}{
+						"page_id": pageID,
+						"title":   page.Title,
+					}))
+			}
+		}
 	}
 
 	return results, nil
@@ -156,7 +191,37 @@ func (s *PublisherService) PublishPageToPlatform(ctx context.Context, pageID str
 	// Publish to specific platform
 	result, err := s.manager.PublishSinglePlatform(ctx, &page, platformName, false)
 	if err != nil {
+		// Record error in monitoring
+		s.monitoringService.RecordError("ERROR", "publisher", fmt.Sprintf("Failed to publish to platform %s", platformName), err.Error(),
+			WithPlatform(platformName),
+			WithPage(page.ID),
+			WithContext(map[string]interface{}{
+				"page_id": pageID,
+				"title":   page.Title,
+			}))
 		return nil, fmt.Errorf("failed to publish to platform %s: %w", platformName, err)
+	}
+
+	// Record metrics
+	if result.Success {
+		s.monitoringService.RecordMetric("publish_success", "counter", 1, map[string]interface{}{
+			"platform": platformName,
+			"page_id":  pageID,
+		})
+	} else {
+		s.monitoringService.RecordMetric("publish_failure", "counter", 1, map[string]interface{}{
+			"platform": platformName,
+			"page_id":  pageID,
+		})
+		if result.Error != nil {
+			s.monitoringService.RecordError("ERROR", "publisher", fmt.Sprintf("Failed to publish to %s", platformName), result.Error.Error(),
+				WithPlatform(platformName),
+				WithPage(page.ID),
+				WithContext(map[string]interface{}{
+					"page_id": pageID,
+					"title":   page.Title,
+				}))
+		}
 	}
 
 	return result, nil

@@ -35,3 +35,6 @@ temp
 bin
 logs
 workspace/
+
+node_modules/
+dist/

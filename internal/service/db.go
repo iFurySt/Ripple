@@ -27,6 +27,11 @@ func NewDatabase(cfg *config.DatabaseConfig) (*gorm.DB, error) {
 		&models.NotionPage{},
 		&models.DistributionJob{},
 		&models.Platform{},
+		&models.SystemStats{},
+		&models.PlatformStats{},
+		&models.ErrorLog{},
+		&models.MetricsSample{},
+		&models.DashboardSummary{},
 	); err != nil {
 		return nil, fmt.Errorf("failed to migrate database: %w", err)
 	}

@@ -1,4 +1,4 @@
-.PHONY: build run dev test clean install tidy
+.PHONY: build run dev test clean install tidy web-install web-dev web-build web-clean dev-with-web build-all clean-all
 
 # Build the application
 build:
@@ -55,3 +55,34 @@ docker-build:
 docker-run:
 	@echo "Running Docker container..."
 	@docker run -p 5334:5334 ripple:latest
+
+# Web Dashboard commands
+web-install:
+	@echo "Installing web dependencies..."
+	@cd web && npm install
+
+web-dev:
+	@echo "Starting web development server..."
+	@cd web && npm run dev
+
+web-build:
+	@echo "Building web dashboard..."
+	@cd web && npm run build
+
+web-clean:
+	@echo "Cleaning web artifacts..."
+	@cd web && rm -rf dist node_modules
+
+# Combined development (requires two terminals)
+dev-with-web: build
+	@echo "Starting backend server..."
+	@echo "Run 'make web-dev' in another terminal for frontend development"
+	@./bin/ripple
+
+# Full build including web dashboard
+build-all: build web-build
+	@echo "Build completed with web dashboard"
+
+# Clean everything including web
+clean-all: clean web-clean
+	@echo "All artifacts cleaned"
