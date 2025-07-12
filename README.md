@@ -7,6 +7,10 @@
 ## ✨ Features
 
 - 📝 **支持 Notion 输入**：通过 API 同步 Notion 笔记
+- 🔐 **安全身份验证**：
+  - Google Authenticator TOTP 验证
+  - 可选的 Dashboard 访问保护
+  - 会话管理
 - 🔍 **内容处理**：
   - 标题优化
   - 摘要生成
@@ -20,6 +24,11 @@
   - [ ] 小红书（可导出待发布内容）
   - [ ] Hugo、Ghost、Notion Blog
   - [ ] 邮件（Mailchimp）
+- 📊 **实时监控 Dashboard**：
+  - 发布状态跟踪
+  - 平台统计分析
+  - 错误日志管理
+  - 任务队列监控
 - 🤖 **AI 助力**（可选）：自动润色、拆分为多条内容、智能摘要
 
 ---
@@ -89,7 +98,67 @@ SUBSTACK_COOKIE=your-cookie-value
 - **微信公众号**: 需要配置 AppID 和 AppSecret
 - **al-folio Blog**: 需要配置 GitHub Token 和仓库信息
 
-### 4. 启动服务
+### 4. 配置 TOTP 身份验证（推荐）
+
+为了保护你的 Dashboard，Ripple 支持使用 Google Authenticator 进行 TOTP（基于时间的一次性密码）身份验证。
+
+#### 4.1 生成 TOTP 密钥
+
+首先临时禁用身份验证以生成密钥：
+
+```bash
+# 在 .env 文件中设置
+AUTH_ENABLED=false
+```
+
+启动服务并生成 TOTP 密钥：
+
+```bash
+# 启动服务
+make run
+
+# 在另一个终端中生成 TOTP 密钥
+curl -X POST http://localhost:5334/api/v1/auth/setup
+```
+
+你会得到类似以下的响应：
+
+```json
+{
+  "message": "Please save this secret and add it to your Google Authenticator app, then update your TOTP_SECRET environment variable",
+  "qr_url": "otpauth://totp/Ripple%20Dashboard:admin?algorithm=SHA1&digits=6&issuer=Ripple%20Dashboard&period=30&secret=XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "secret": "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+}
+```
+
+#### 4.2 配置 Google Authenticator
+
+1. 在手机上安装 Google Authenticator 应用
+2. 扫描返回的 QR 码 URL 或手动输入 secret
+3. 应用会显示"Ripple Dashboard (admin)"账户
+
+#### 4.3 更新环境变量
+
+将生成的密钥添加到 `.env` 文件中：
+
+```bash
+# 启用身份验证
+AUTH_ENABLED=true
+
+# 填入生成的密钥
+TOTP_SECRET=你生成的密钥
+```
+
+#### 4.4 重启服务
+
+```bash
+# 重启服务以启用身份验证
+make run
+```
+
+现在访问 `http://localhost:5334` 会自动跳转到登录页面，需要输入 Google Authenticator 生成的 6 位数字验证码。
+
+### 5. 启动服务
 
 ```bash
 # 安装依赖
@@ -103,32 +172,100 @@ make run
 
 ## 📚 API 使用
 
-### 同步 Notion 页面
+### 身份验证 API
+
+#### 生成 TOTP 密钥
+
+```bash
+curl -X POST http://localhost:5334/api/v1/auth/setup
+```
+
+#### 登录验证
+
+```bash
+curl -X POST http://localhost:5334/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"token": "123456"}'
+```
+
+#### 登出
+
+```bash
+curl -X POST http://localhost:5334/api/v1/auth/logout
+```
+
+### Notion API
+
+#### 同步 Notion 页面
 
 ```bash
 curl -X POST http://localhost:5334/api/v1/notion/sync
 ```
 
-### 发布到所有平台
+#### 获取所有页面
+
+```bash
+curl -X GET http://localhost:5334/api/v1/notion/pages
+```
+
+### 发布 API
+
+#### 发布到所有平台
 
 ```bash
 curl -X POST http://localhost:5334/api/v1/publisher/publish/{pageId}
 ```
 
-### 发布到 Substack
+#### 发布到指定平台
 
 ```bash
-# 创建草稿
-curl -X POST http://localhost:5334/api/v1/publisher/draft/{pageId}/substack
-
 # 发布到 Substack
 curl -X POST http://localhost:5334/api/v1/publisher/publish/{pageId}/substack
+
+# 发布到微信公众号
+curl -X POST http://localhost:5334/api/v1/publisher/publish/{pageId}/wechat-official
+
+# 发布到 al-folio Blog
+curl -X POST http://localhost:5334/api/v1/publisher/publish/{pageId}/al-folio
 ```
 
-### 查看发布历史
+#### 创建草稿
+
+```bash
+# 创建 Substack 草稿
+curl -X POST http://localhost:5334/api/v1/publisher/draft/{pageId}/substack
+```
+
+#### 查看发布历史
 
 ```bash
 curl -X GET http://localhost:5334/api/v1/publisher/history/{pageId}
+```
+
+### Dashboard API
+
+#### 获取仪表板摘要
+
+```bash
+curl -X GET http://localhost:5334/api/v1/dashboard/summary
+```
+
+#### 获取平台统计
+
+```bash
+curl -X GET http://localhost:5334/api/v1/dashboard/platform-stats?days=7
+```
+
+#### 获取最近错误
+
+```bash
+curl -X GET http://localhost:5334/api/v1/dashboard/recent-errors?limit=20
+```
+
+#### 获取任务列表
+
+```bash
+curl -X GET http://localhost:5334/api/v1/dashboard/jobs?status=pending&limit=20&offset=0
 ```
 
 ---
@@ -154,6 +291,10 @@ notion:
   token: "${NOTION_TOKEN:}"
   database_id: "${NOTION_DATABASE_ID:}"
 
+auth:
+  enabled: ${AUTH_ENABLED:true}
+  totp_secret: "${TOTP_SECRET:}"
+
 publisher:
   substack:
     enabled: ${SUBSTACK_ENABLED:false}
@@ -161,17 +302,18 @@ publisher:
     cookie: "${SUBSTACK_COOKIE:}"
     auto_publish: ${SUBSTACK_AUTO_PUBLISH:false}
   
-  wechat:
-    enabled: ${WECHAT_ENABLED:false}
-    app_id: "${WECHAT_APP_ID:}"
-    app_secret: "${WECHAT_APP_SECRET:}"
+  wechat_official:
+    enabled: ${WECHAT_OFFICIAL_ENABLED:false}
+    app_id: "${WECHAT_OFFICIAL_APP_ID:}"
+    app_secret: "${WECHAT_OFFICIAL_APP_SECRET:}"
+    auto_publish: ${WECHAT_OFFICIAL_AUTO_PUBLISH:false}
   
   al_folio:
     enabled: ${AL_FOLIO_ENABLED:false}
-    github_token: "${AL_FOLIO_GITHUB_TOKEN:}"
-    repo_owner: "${AL_FOLIO_REPO_OWNER:}"
-    repo_name: "${AL_FOLIO_REPO_NAME:}"
-    branch: "${AL_FOLIO_BRANCH:main}"
+    repo_url: "${AL_FOLIO_REPO_URL:}"
+    branch: "${AL_FOLIO_BRANCH:master}"
+    workspace_dir: "${AL_FOLIO_WORKSPACE:workspace}"
+    auto_publish: ${AL_FOLIO_AUTO_PUBLISH:false}
 ```
 
 ---

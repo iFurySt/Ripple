@@ -31,6 +31,7 @@ type Server struct {
 	MonitoringService  *service.MonitoringService
 	StatsUpdater       *service.StatsUpdater
 	Scheduler          *service.Scheduler
+	AuthService        *service.AuthService
 }
 
 func NewServer(cfg *config.Config, logger *zap.Logger) (*Server, error) {
@@ -49,6 +50,7 @@ func NewServer(cfg *config.Config, logger *zap.Logger) (*Server, error) {
 	monitoringService := service.NewMonitoringService(db, logger)
 	statsUpdater := service.NewStatsUpdater(monitoringService, logger, 15*time.Minute) // Update every 15 minutes
 	scheduler := service.NewScheduler(&cfg.Scheduler, logger, notionService, publisherService)
+	authService := service.NewAuthService(logger, cfg.Auth.TOTPSecret)
 
 	// Create router
 	router := gin.New()
@@ -64,6 +66,7 @@ func NewServer(cfg *config.Config, logger *zap.Logger) (*Server, error) {
 		MonitoringService: monitoringService,
 		StatsUpdater:      statsUpdater,
 		Scheduler:         scheduler,
+		AuthService:       authService,
 	}
 
 	// Setup middleware and routes
@@ -107,9 +110,19 @@ func (s *Server) setupMiddleware() {
 
 		c.Next()
 	})
+
+	// Auth middleware (conditionally applied)
+	if s.Config.Auth.Enabled {
+		s.Router.Use(s.AuthService.AuthMiddleware())
+	}
 }
 
 func (s *Server) setupRoutes() {
+	// Login page (bypass auth)
+	s.Router.GET("/login", func(c *gin.Context) {
+		c.File("./web/dist/index.html")
+	})
+
 	// Serve static files for dashboard
 	s.Router.Static("/assets", "./web/dist/assets")
 	s.Router.StaticFile("/favicon.ico", "./web/dist/favicon.ico")
@@ -147,6 +160,14 @@ func (s *Server) setupRoutes() {
 	// API routes
 	api := s.Router.Group("/api/v1")
 	{
+		// Auth routes (bypass auth middleware)
+		auth := api.Group("/auth")
+		{
+			auth.POST("/login", s.handleLogin)
+			auth.POST("/setup", s.handleSetup)
+			auth.POST("/logout", s.handleLogout)
+		}
+
 		// Notion routes
 		notion := api.Group("/notion")
 		{
@@ -633,4 +654,60 @@ func (s *Server) handleRepublishJob(c *gin.Context) {
 			"published_at": updatedJob.PublishedAt,
 		},
 	})
+}
+
+// Auth handlers
+
+func (s *Server) handleLogin(c *gin.Context) {
+	var req struct {
+		Token string `json:"token" binding:"required"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Token is required"})
+		return
+	}
+
+	if !s.AuthService.ValidateToken(req.Token) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		return
+	}
+
+	sessionToken := s.AuthService.CreateSession()
+	c.JSON(http.StatusOK, gin.H{
+		"message":       "Login successful",
+		"session_token": sessionToken,
+	})
+}
+
+func (s *Server) handleSetup(c *gin.Context) {
+	if s.Config.Auth.TOTPSecret != "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "TOTP secret already configured"})
+		return
+	}
+
+	secret, err := s.AuthService.GenerateSecret()
+	if err != nil {
+		s.Logger.Error("Failed to generate TOTP secret", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate secret"})
+		return
+	}
+
+	qrURL, err := s.AuthService.GenerateQRCode("Ripple Dashboard", "admin", secret)
+	if err != nil {
+		s.Logger.Error("Failed to generate QR code URL", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate QR code"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"secret": secret,
+		"qr_url": qrURL,
+		"message": "Please save this secret and add it to your Google Authenticator app, then update your TOTP_SECRET environment variable",
+	})
+}
+
+func (s *Server) handleLogout(c *gin.Context) {
+	c.SetCookie("auth_token", "", -1, "/", "", false, true)
+	c.JSON(http.StatusOK, gin.H{"message": "Logged out successfully"})
 }

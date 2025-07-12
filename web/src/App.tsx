@@ -1,6 +1,8 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { NavigationTabs } from '@/components/NavigationTabs'
+import { LoginPage } from '@/components/LoginPage'
 import { Waves } from 'lucide-react'
+import { useState, useEffect } from 'react'
 
 function DashboardContent() {
 
@@ -43,15 +45,78 @@ function DashboardContent() {
   )
 }
 
+function AuthWrapper() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const location = useLocation();
+
+  useEffect(() => {
+    // Check if user is authenticated by looking for auth cookie
+    const checkAuth = () => {
+      const authToken = document.cookie
+        .split('; ')
+        .find(row => row.startsWith('auth_token='));
+      
+      setIsAuthenticated(!!authToken);
+      setIsLoading(false);
+    };
+
+    checkAuth();
+  }, []);
+
+  const handleLogin = () => {
+    setIsAuthenticated(true);
+    // Redirect to original destination or dashboard
+    const redirectTo = location.pathname === '/login' ? '/overview' : location.pathname;
+    window.location.href = redirectTo;
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/v1/auth/logout', { method: 'POST' });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    setIsAuthenticated(false);
+    window.location.href = '/login';
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Waves className="h-8 w-8 text-primary mx-auto mb-4 animate-pulse" />
+          <p>Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated && location.pathname !== '/login') {
+    return <LoginPage onLogin={handleLogin} />;
+  }
+
+  if (isAuthenticated && location.pathname === '/login') {
+    return <Navigate to="/overview" replace />;
+  }
+
+  if (location.pathname === '/login') {
+    return <LoginPage onLogin={handleLogin} />;
+  }
+
+  return <DashboardContent />;
+}
+
 function App() {
   return (
     <Router>
       <Routes>
         <Route path="/" element={<Navigate to="/overview" replace />} />
-        <Route path="/overview" element={<DashboardContent />} />
-        <Route path="/platforms" element={<DashboardContent />} />
-        <Route path="/trends" element={<DashboardContent />} />
-        <Route path="/errors" element={<DashboardContent />} />
+        <Route path="/login" element={<AuthWrapper />} />
+        <Route path="/overview" element={<AuthWrapper />} />
+        <Route path="/platforms" element={<AuthWrapper />} />
+        <Route path="/trends" element={<AuthWrapper />} />
+        <Route path="/errors" element={<AuthWrapper />} />
         <Route path="*" element={<Navigate to="/overview" replace />} />
       </Routes>
     </Router>

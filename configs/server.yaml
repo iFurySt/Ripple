@@ -59,3 +59,7 @@ publisher:
     domain: "${SUBSTACK_DOMAIN:}"
     cookie: "${SUBSTACK_COOKIE:}"
     auto_publish: ${SUBSTACK_AUTO_PUBLISH:false}
+
+auth:
+  enabled: ${AUTH_ENABLED:true}
+  totp_secret: "${TOTP_SECRET:}"

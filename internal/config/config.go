@@ -12,6 +12,7 @@ type Config struct {
 	Notion    NotionConfig    `yaml:"notion"`
 	Scheduler SchedulerConfig `yaml:"scheduler"`
 	Publisher PublisherConfig `yaml:"publisher"`
+	Auth      AuthConfig      `yaml:"auth"`
 }
 
 type ServerConfig struct {
@@ -75,4 +76,9 @@ type SubstackConfig struct {
 	Domain      string `yaml:"domain"`
 	Cookie      string `yaml:"cookie"`
 	AutoPublish bool   `yaml:"auto_publish"`
+}
+
+type AuthConfig struct {
+	TOTPSecret string `yaml:"totp_secret"`
+	Enabled    bool   `yaml:"enabled"`
 }
