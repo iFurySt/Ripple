@@ -400,19 +400,33 @@ func (p *AlFolioPublisher) generateSlugFromFilename(filename string) string {
 func (p *AlFolioPublisher) runPrettier(ctx context.Context) error {
 	// Get the repository path
 	repoPath := p.repository.GetLocalPath()
-	
-	// Create the command to run prettier
+
+	// First, run npm ci to ensure dependencies are installed
+	p.logger.Info("Installing dependencies with npm ci...")
+	npmCmd := exec.CommandContext(ctx, "npm", "ci")
+	npmCmd.Dir = repoPath
+
+	npmOutput, err := npmCmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("npm ci command failed: %w, output: %s", err, string(npmOutput))
+	}
+
+	p.logger.Info("Dependencies installed successfully",
+		zap.String("output", string(npmOutput)))
+
+	// Then run prettier to format the markdown file
+	p.logger.Info("Running prettier to format files...")
 	cmd := exec.CommandContext(ctx, "npx", "prettier", "--write", ".")
 	cmd.Dir = repoPath
-	
+
 	// Run the command
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("prettier command failed: %w, output: %s", err, string(output))
 	}
-	
+
 	p.logger.Info("Prettier formatting completed",
 		zap.String("output", string(output)))
-	
+
 	return nil
 }
