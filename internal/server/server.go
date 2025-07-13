@@ -46,7 +46,7 @@ func NewServer(cfg *config.Config, logger *zap.Logger) (*Server, error) {
 
 	// Initialize services
 	notionService := notion.NewService(&cfg.Notion, db, logger)
-	publisherService := service.NewPublisherService(cfg, db, logger)
+	publisherService := service.NewPublisherService(cfg, db, logger, notionService)
 	monitoringService := service.NewMonitoringService(db, logger)
 	statsUpdater := service.NewStatsUpdater(monitoringService, logger, 15*time.Minute) // Update every 15 minutes
 	scheduler := service.NewScheduler(&cfg.Scheduler, logger, notionService, publisherService)

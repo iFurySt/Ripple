@@ -385,6 +385,11 @@ func (m *Manager) PublishSinglePlatform(ctx context.Context, page *models.Notion
 
 // Helper methods
 
+// MapPlatformName maps Notion platform names to system platform names
+func (m *Manager) MapPlatformName(notionPlatform string) string {
+	return m.mapPlatformName(notionPlatform)
+}
+
 func (m *Manager) mapPlatformName(notionPlatform string) string {
 	// Map Notion platform names to system platform names
 	platformMap := map[string]string{
@@ -393,6 +398,7 @@ func (m *Manager) mapPlatformName(notionPlatform string) string {
 		"Jekyll":     "al-folio",
 		"jekyll":     "al-folio",
 		"微信公众号": "wechat-official",
+		"微信公众号短文": "wechat-official",
 		"WeChat":     "wechat-official",
 		"wechat":     "wechat-official",
 		"Substack":   "substack",

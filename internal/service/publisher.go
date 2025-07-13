@@ -9,6 +9,7 @@ import (
 
 	"github.com/ifuryst/ripple/internal/config"
 	"github.com/ifuryst/ripple/internal/models"
+	"github.com/ifuryst/ripple/internal/service/notion"
 	"github.com/ifuryst/ripple/internal/service/publisher"
 	"github.com/ifuryst/ripple/internal/service/publisher/al_folio"
 	"github.com/ifuryst/ripple/internal/service/publisher/substack"
@@ -22,15 +23,17 @@ type PublisherService struct {
 	config             *config.Config
 	manager            *publisher.Manager
 	monitoringService  *MonitoringService
+	notionService      *notion.Service
 }
 
-func NewPublisherService(cfg *config.Config, db *gorm.DB, logger *zap.Logger) *PublisherService {
+func NewPublisherService(cfg *config.Config, db *gorm.DB, logger *zap.Logger, notionService *notion.Service) *PublisherService {
 	service := &PublisherService{
 		logger:            logger,
 		db:                db,
 		config:            cfg,
 		manager:           publisher.NewPublishManager(logger, db),
 		monitoringService: NewMonitoringService(db, logger),
+		notionService:     notionService,
 	}
 
 	// Register publishers
@@ -314,6 +317,43 @@ func (s *PublisherService) ProcessPendingPages(ctx context.Context) error {
 				zap.String("platform", platform),
 				zap.Bool("success", result.Success))
 		}
+
+		// Check if all platforms are now completed for this page and page status is Done
+		allCompleted, err := s.checkAllPlatformsCompleted(ctx, &page)
+		if err != nil {
+			s.logger.Error("Failed to check platform completion status",
+				zap.String("page_id", page.NotionID),
+				zap.Error(err))
+			continue
+		}
+
+		s.logger.Info("Platform completion check",
+			zap.String("page_id", page.NotionID),
+			zap.String("current_status", page.Status),
+			zap.Bool("all_completed", allCompleted),
+			zap.Strings("required_platforms", page.Platforms))
+
+		// Only update to Published if all platforms are completed AND page status is Done
+		if allCompleted && page.Status == "Done" {
+			// Update page status to Published
+			if err := s.updatePageToPublished(ctx, &page); err != nil {
+				s.logger.Error("Failed to update page status to Published",
+					zap.String("page_id", page.NotionID),
+					zap.Error(err))
+				continue
+			}
+
+			// Update Notion page status
+			if err := s.updateNotionPageStatus(ctx, page.NotionID, "Published"); err != nil {
+				s.logger.Error("Failed to update Notion page status",
+					zap.String("page_id", page.NotionID),
+					zap.Error(err))
+			}
+
+			s.logger.Info("Page published to all platforms and status updated",
+				zap.String("page_id", page.NotionID),
+				zap.String("title", page.Title))
+		}
 	}
 
 	return nil
@@ -343,4 +383,67 @@ func (s *PublisherService) needsPublishing(ctx context.Context, page *models.Not
 	}
 
 	return false, nil
+}
+
+// checkAllPlatformsCompleted checks if all required platforms for a page have been successfully published
+func (s *PublisherService) checkAllPlatformsCompleted(ctx context.Context, page *models.NotionPage) (bool, error) {
+	// Get all distribution jobs for this page
+	var jobs []models.DistributionJob
+	if err := s.db.Preload("Platform").Where("page_id = ?", page.ID).Find(&jobs).Error; err != nil {
+		return false, fmt.Errorf("failed to get distribution jobs: %w", err)
+	}
+
+	// Create a map of platform name to job status
+	platformStatus := make(map[string]string)
+	for _, job := range jobs {
+		platformStatus[job.Platform.Name] = job.Status
+	}
+
+	// Check if all required platforms are completed
+	// We need to map Notion platform names to system platform names
+	for _, notionPlatformName := range page.Platforms {
+		// Map the Notion platform name to the system platform name
+		systemPlatformName := s.manager.MapPlatformName(notionPlatformName)
+		if systemPlatformName == "" {
+			s.logger.Warn("Unknown platform name in checkAllPlatformsCompleted", 
+				zap.String("notion_platform", notionPlatformName))
+			return false, nil
+		}
+		
+		status, exists := platformStatus[systemPlatformName]
+		if !exists || status != "completed" {
+			s.logger.Debug("Platform not completed",
+				zap.String("notion_platform", notionPlatformName),
+				zap.String("system_platform", systemPlatformName),
+				zap.String("status", status),
+				zap.Bool("exists", exists))
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+// updatePageToPublished updates the page status to 'Published' in the database
+func (s *PublisherService) updatePageToPublished(ctx context.Context, page *models.NotionPage) error {
+	if err := s.db.Model(page).Update("status", "Published").Error; err != nil {
+		return fmt.Errorf("failed to update page status to Published: %w", err)
+	}
+	return nil
+}
+
+// updateNotionPageStatus updates the page status in Notion
+func (s *PublisherService) updateNotionPageStatus(ctx context.Context, notionID string, status string) error {
+	if s.notionService == nil {
+		s.logger.Warn("Notion service not available, skipping status update",
+			zap.String("notion_id", notionID),
+			zap.String("status", status))
+		return nil
+	}
+
+	if err := s.notionService.UpdatePageStatus(notionID, status); err != nil {
+		return fmt.Errorf("failed to update Notion page status: %w", err)
+	}
+	
+	return nil
 }

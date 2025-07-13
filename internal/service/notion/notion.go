@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"strings"
 	"time"
@@ -238,4 +239,62 @@ func (s *Service) GetAllPages() ([]models.NotionPage, error) {
 		return nil, fmt.Errorf("failed to get pages: %w", err)
 	}
 	return pages, nil
+}
+
+// UpdatePageStatus updates the status property of a Notion page
+func (s *Service) UpdatePageStatus(pageID, status string) error {
+	url := fmt.Sprintf("https://api.notion.com/v1/pages/%s", pageID)
+	
+	payload := map[string]interface{}{
+		"properties": map[string]interface{}{
+			"Status": map[string]interface{}{
+				"status": map[string]string{
+					"name": status,
+				},
+			},
+		},
+	}
+
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal payload: %w", err)
+	}
+
+	s.logger.Info("Updating Notion page status",
+		zap.String("page_id", pageID),
+		zap.String("status", status),
+		zap.String("payload", string(payloadBytes)))
+
+	req, err := http.NewRequest("PATCH", url, strings.NewReader(string(payloadBytes)))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.config.Token))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Notion-Version", "2022-06-28")
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Read response body for debugging
+	bodyBytes, readErr := ioutil.ReadAll(resp.Body)
+	if readErr == nil {
+		s.logger.Debug("Notion API response", 
+			zap.Int("status_code", resp.StatusCode),
+			zap.String("response_body", string(bodyBytes)))
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("notion API error: status %d, response: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	s.logger.Info("Successfully updated Notion page status",
+		zap.String("page_id", pageID),
+		zap.String("status", status))
+
+	return nil
 }
