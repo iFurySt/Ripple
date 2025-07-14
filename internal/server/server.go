@@ -26,12 +26,12 @@ type Server struct {
 	Server *http.Server
 
 	// Services
-	NotionService      *notion.Service
-	PublisherService   *service.PublisherService
-	MonitoringService  *service.MonitoringService
-	StatsUpdater       *service.StatsUpdater
-	Scheduler          *service.Scheduler
-	AuthService        *service.AuthService
+	NotionService     *notion.Service
+	PublisherService  *service.PublisherService
+	MonitoringService *service.MonitoringService
+	StatsUpdater      *service.StatsUpdater
+	Scheduler         *service.Scheduler
+	AuthService       *service.AuthService
 }
 
 func NewServer(cfg *config.Config, logger *zap.Logger) (*Server, error) {
@@ -81,21 +81,7 @@ func (s *Server) setupMiddleware() {
 	s.Router.Use(gin.Recovery())
 
 	// Logger middleware
-	s.Router.Use(gin.LoggerWithConfig(gin.LoggerConfig{
-		Formatter: func(param gin.LogFormatterParams) string {
-			return fmt.Sprintf("%s - [%s] \"%s %s %s %d %s \"%s\" %s\"\n",
-				param.ClientIP,
-				param.TimeStamp.Format(time.RFC3339),
-				param.Method,
-				param.Path,
-				param.Request.Proto,
-				param.StatusCode,
-				param.Latency,
-				param.Request.UserAgent(),
-				param.ErrorMessage,
-			)
-		},
-	}))
+	s.Router.Use(gin.Logger())
 
 	// CORS middleware
 	s.Router.Use(func(c *gin.Context) {
@@ -126,12 +112,12 @@ func (s *Server) setupRoutes() {
 	// Serve static files for dashboard
 	s.Router.Static("/assets", "./web/dist/assets")
 	s.Router.StaticFile("/favicon.ico", "./web/dist/favicon.ico")
-	
+
 	// Serve dashboard index.html for root path
 	s.Router.GET("/", func(c *gin.Context) {
 		c.File("./web/dist/index.html")
 	})
-	
+
 	// Serve dashboard for SPA routes (overview, platforms, trends, errors)
 	dashboardRoutes := []string{"/overview", "/platforms", "/trends", "/errors"}
 	for _, route := range dashboardRoutes {
@@ -139,7 +125,7 @@ func (s *Server) setupRoutes() {
 			c.File("./web/dist/index.html")
 		})
 	}
-	
+
 	// Serve dashboard for any other route that doesn't start with /api
 	s.Router.NoRoute(func(c *gin.Context) {
 		if !strings.HasPrefix(c.Request.URL.Path, "/api") {
@@ -426,7 +412,7 @@ func (s *Server) handleGetSystemStats(c *gin.Context) {
 
 	var stats []models.SystemStats
 	startDate := time.Now().AddDate(0, 0, -days).Truncate(24 * time.Hour)
-	
+
 	err := s.DB.Where("date >= ?", startDate).Order("date desc").Find(&stats).Error
 	if err != nil {
 		s.Logger.Error("Failed to get system stats", zap.Error(err))
@@ -546,7 +532,7 @@ func (s *Server) handleGetJobs(c *gin.Context) {
 
 	var jobs []models.DistributionJob
 	var total int64
-	
+
 	// Get total count
 	countQuery := s.DB.Model(&models.DistributionJob{})
 	if status != "" {
@@ -598,9 +584,9 @@ func (s *Server) handleRepublishJob(c *gin.Context) {
 		return
 	}
 
-	s.Logger.Info("Manually republishing job", 
-		zap.Uint64("job_id", jobID), 
-		zap.String("page_id", job.Page.NotionID), 
+	s.Logger.Info("Manually republishing job",
+		zap.Uint64("job_id", jobID),
+		zap.String("page_id", job.Page.NotionID),
 		zap.String("platform", job.Platform.Name),
 		zap.String("original_status", job.Status))
 
@@ -701,8 +687,8 @@ func (s *Server) handleSetup(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"secret": secret,
-		"qr_url": qrURL,
+		"secret":  secret,
+		"qr_url":  qrURL,
 		"message": "Please save this secret and add it to your Google Authenticator app, then update your TOTP_SECRET environment variable",
 	})
 }

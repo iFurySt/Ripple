@@ -1,4 +1,4 @@
-.PHONY: build run dev test clean install tidy web-install web-dev web-build web-clean dev-with-web build-all clean-all
+.PHONY: build run dev test clean install tidy web-install web-dev web-build web-clean dev-with-web build-all clean-all docker-build docker-run docker-run-with-env docker-stop docker-test docker-compose-up docker-compose-down
 
 # Build the application
 build:
@@ -54,7 +54,33 @@ docker-build:
 # Docker run
 docker-run:
 	@echo "Running Docker container..."
-	@docker run -p 5334:5334 ripple:latest
+	@docker run -p 5334:5334 --env-file .env ripple:latest
+
+# Docker run with environment
+docker-run-with-env:
+	@echo "Running Docker container with environment..."
+	@docker run -p 5334:5334 --name ripple-test \
+		--env-file .env \
+		-v $(PWD)/logs:/opt/ripple/logs \
+		ripple:latest
+
+# Docker stop and remove test container
+docker-stop:
+	@echo "Stopping and removing test container..."
+	@docker stop ripple-test || true
+	@docker rm ripple-test || true
+
+# Docker test - full cycle
+docker-test: docker-build docker-stop docker-run-with-env
+
+# Docker compose commands
+docker-compose-up:
+	@echo "Starting with docker-compose..."
+	@docker-compose up --build
+
+docker-compose-down:
+	@echo "Stopping docker-compose..."
+	@docker-compose down
 
 # Web Dashboard commands
 web-install:

@@ -2,6 +2,7 @@ package service
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -58,10 +59,12 @@ func (a *AuthService) ValidateToken(token string) bool {
 
 func (a *AuthService) AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Skip auth for login page and API auth endpoints
+		// Skip auth for login page, static assets, and API auth endpoints
 		if c.Request.URL.Path == "/login" || 
 		   c.Request.URL.Path == "/api/v1/auth/login" ||
-		   c.Request.URL.Path == "/api/v1/auth/setup" {
+		   c.Request.URL.Path == "/api/v1/auth/setup" ||
+		   c.Request.URL.Path == "/favicon.ico" ||
+		   strings.HasPrefix(c.Request.URL.Path, "/assets/") {
 			c.Next()
 			return
 		}
