@@ -18,13 +18,6 @@ database:
 logger:
   level: "${LOG_LEVEL:info}"
   format: "${LOG_FORMAT:console}"
-  filename: "${LOG_FILENAME:logs/ripple.log}"
-  max_size: ${LOG_MAX_SIZE:10}
-  max_age: ${LOG_MAX_AGE:30}
-  max_backups: ${LOG_MAX_BACKUPS:5}
-  local_time: ${LOG_LOCAL_TIME:true}
-  compress: ${LOG_COMPRESS:true}
-  console: ${LOG_CONSOLE:true}
   time_format: "${LOG_TIME_FORMAT:2006-01-02 15:04:05}"
   timezone: "${LOG_TIMEZONE:Local}"
 

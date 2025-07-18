@@ -5,9 +5,9 @@ go 1.24.1
 require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/ifuryst/go-yaml-env v0.1.1
+	github.com/pquerna/otp v1.5.0
 	github.com/spf13/cobra v1.8.0
 	go.uber.org/zap v1.26.0
-	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gorm.io/driver/postgres v1.5.4
 	gorm.io/gorm v1.25.5
 )
@@ -36,7 +36,6 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect
-	github.com/pquerna/otp v1.5.0 // indirect
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect

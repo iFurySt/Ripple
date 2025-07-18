@@ -7,21 +7,13 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 type Config struct {
-	Level       string `yaml:"level"`
-	Format      string `yaml:"format"`
-	Filename    string `yaml:"filename"`
-	MaxSize     int    `yaml:"max_size"`
-	MaxAge      int    `yaml:"max_age"`
-	MaxBackups  int    `yaml:"max_backups"`
-	LocalTime   bool   `yaml:"local_time"`
-	Compress    bool   `yaml:"compress"`
-	Console     bool   `yaml:"console"`
-	TimeFormat  string `yaml:"time_format"`
-	Timezone    string `yaml:"timezone"`
+	Level      string `yaml:"level"`
+	Format     string `yaml:"format"`
+	TimeFormat string `yaml:"time_format"`
+	Timezone   string `yaml:"timezone"`
 }
 
 func NewLogger(cfg Config) (*zap.Logger, error) {
@@ -69,31 +61,10 @@ func NewLogger(cfg Config) (*zap.Logger, error) {
 		encoder = zapcore.NewConsoleEncoder(encoderConfig)
 	}
 
-	// Create writers
-	var writers []zapcore.WriteSyncer
-
-	// Console writer
-	if cfg.Console {
-		writers = append(writers, zapcore.AddSync(os.Stdout))
-	}
-
-	// File writer
-	if cfg.Filename != "" {
-		fileWriter := zapcore.AddSync(&lumberjack.Logger{
-			Filename:   cfg.Filename,
-			MaxSize:    cfg.MaxSize,
-			MaxAge:     cfg.MaxAge,
-			MaxBackups: cfg.MaxBackups,
-			LocalTime:  cfg.LocalTime,
-			Compress:   cfg.Compress,
-		})
-		writers = append(writers, fileWriter)
-	}
-
-	// Create core
+	// Create core with stdout only
 	core := zapcore.NewCore(
 		encoder,
-		zapcore.NewMultiWriteSyncer(writers...),
+		zapcore.AddSync(os.Stdout),
 		level,
 	)
 
