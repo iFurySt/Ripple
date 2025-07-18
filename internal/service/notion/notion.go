@@ -1,6 +1,8 @@
 package notion
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -46,12 +48,22 @@ type Service struct {
 }
 
 func NewService(config *config.NotionConfig, db *gorm.DB, logger *zap.Logger) *Service {
+	// Load system CA certificates
+	caCertPool, err := x509.SystemCertPool()
+	if err != nil {
+		logger.Warn("Failed to load system CA certificates, using empty pool", zap.Error(err))
+		caCertPool = x509.NewCertPool()
+	}
+
 	tr := &http.Transport{
 		IdleConnTimeout:       120 * time.Second,
 		MaxIdleConns:          10,
 		MaxIdleConnsPerHost:   10,
 		TLSHandshakeTimeout:   20 * time.Second,
 		ResponseHeaderTimeout: 20 * time.Second,
+		TLSClientConfig: &tls.Config{
+			RootCAs: caCertPool,
+		},
 	}
 	return &Service{
 		config: config,
