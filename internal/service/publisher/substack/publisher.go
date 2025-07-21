@@ -236,10 +236,16 @@ func (p *SubstackPublisher) SaveToDraft(ctx context.Context, content publisher.P
 	p.logger.Debug("Content transformed successfully", 
 		zap.Int("transformed_resources_count", len(transformedContent.Resources)))
 
+	// Use English title as subtitle if available, otherwise fall back to summary
+	subtitle := transformedContent.Summary
+	if enTitle, exists := transformedContent.Metadata["en_title"]; exists && enTitle != "" {
+		subtitle = enTitle
+	}
+
 	// Create draft request
 	draftRequest := SubstackCreateDraftRequest{
 		DraftTitle:                      transformedContent.Title,
-		DraftSubtitle:                   transformedContent.Summary,
+		DraftSubtitle:                   subtitle,
 		DraftPodcastURL:                 "",
 		DraftPodcastDuration:            nil,
 		DraftVideoUploadID:              nil,
