@@ -17,6 +17,8 @@ type Repository struct {
 	localPath   string
 	branch      string
 	workspaceDir string
+	gitUsername string
+	gitEmail    string
 }
 
 // RepositoryConfig contains configuration for git repository
@@ -24,6 +26,8 @@ type RepositoryConfig struct {
 	URL          string `json:"url"`
 	Branch       string `json:"branch"`
 	WorkspaceDir string `json:"workspace_dir"`
+	GitUsername  string `json:"git_username"`
+	GitEmail     string `json:"git_email"`
 }
 
 func NewRepository(config RepositoryConfig, logger *zap.Logger) *Repository {
@@ -37,6 +41,8 @@ func NewRepository(config RepositoryConfig, logger *zap.Logger) *Repository {
 		localPath:    localPath,
 		branch:       config.Branch,
 		workspaceDir: config.WorkspaceDir,
+		gitUsername:  config.GitUsername,
+		gitEmail:     config.GitEmail,
 	}
 }
 
@@ -222,8 +228,43 @@ func (r *Repository) Add(files ...string) error {
 	return nil
 }
 
+// ConfigureGitUser sets up git user configuration for the repository
+func (r *Repository) ConfigureGitUser() error {
+	if r.gitUsername == "" || r.gitEmail == "" {
+		r.logger.Warn("Git username or email not configured, skipping git user setup",
+			zap.String("username", r.gitUsername),
+			zap.String("email", r.gitEmail))
+		return nil
+	}
+
+	// Set git user name
+	cmd := exec.Command("git", "config", "user.name", r.gitUsername)
+	cmd.Dir = r.localPath
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to set git user name: %s, output: %s", err, string(output))
+	}
+
+	// Set git user email
+	cmd = exec.Command("git", "config", "user.email", r.gitEmail)
+	cmd.Dir = r.localPath
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to set git user email: %s, output: %s", err, string(output))
+	}
+
+	r.logger.Info("Git user configured successfully",
+		zap.String("username", r.gitUsername),
+		zap.String("email", r.gitEmail))
+
+	return nil
+}
+
 // Commit creates a commit with the given message
 func (r *Repository) Commit(message string) error {
+	// Configure git user before committing
+	if err := r.ConfigureGitUser(); err != nil {
+		return fmt.Errorf("failed to configure git user: %w", err)
+	}
+
 	cmd := exec.Command("git", "commit", "-m", message)
 	cmd.Dir = r.localPath
 	

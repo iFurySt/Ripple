@@ -60,6 +60,8 @@ func (s *PublisherService) registerPublishers() {
 					"base_url":       s.config.Publisher.AlFolio.BaseURL,
 					"commit_message": s.config.Publisher.AlFolio.CommitMessage,
 					"auto_publish":   fmt.Sprintf("%t", s.config.Publisher.AlFolio.AutoPublish),
+					"git_username":   s.config.Publisher.AlFolio.GitUsername,
+					"git_email":      s.config.Publisher.AlFolio.GitEmail,
 				},
 			}
 			s.manager.SetPlatformConfig("al-folio", cfg)

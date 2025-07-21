@@ -49,6 +49,8 @@ func (p *AlFolioPublisher) Initialize(ctx context.Context, config publisher.Publ
 		URL:          config.Config["repo_url"],
 		Branch:       config.Config["branch"],
 		WorkspaceDir: config.Config["workspace_dir"],
+		GitUsername:  config.Config["git_username"],
+		GitEmail:     config.Config["git_email"],
 	}
 
 	p.repository = git.NewRepository(repoConfig, p.logger)

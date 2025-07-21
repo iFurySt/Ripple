@@ -39,6 +39,8 @@ publisher:
     base_url: "${AL_FOLIO_BASE_URL:https://ifuryst.github.io}"
     commit_message: "${AL_FOLIO_COMMIT_MESSAGE:Add new post via Ripple}"
     auto_publish: ${AL_FOLIO_AUTO_PUBLISH:false}
+    git_username: "${AL_FOLIO_GIT_USERNAME:Ripple}"
+    git_email: "${AL_FOLIO_GIT_EMAIL:ripple@amoylab.com}"
   wechat_official:
     enabled: ${WECHAT_OFFICIAL_ENABLED:false}
     app_id: "${WECHAT_OFFICIAL_APP_ID:}"

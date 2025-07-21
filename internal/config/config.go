@@ -59,6 +59,8 @@ type AlFolioConfig struct {
 	BaseURL       string `yaml:"base_url"`
 	CommitMessage string `yaml:"commit_message"`
 	AutoPublish   bool   `yaml:"auto_publish"`
+	GitUsername   string `yaml:"git_username"`
+	GitEmail      string `yaml:"git_email"`
 }
 
 type WeChatOfficialConfig struct {
