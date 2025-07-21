@@ -27,7 +27,11 @@ FROM ubuntu:22.04
 
 WORKDIR /opt/ripple
 
-RUN apt-get update && apt-get install -y ca-certificates git && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y ca-certificates git curl && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    npm install -g prettier && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy the binary
 COPY --from=go-builder /app/bin/ripple /opt/ripple/bin/ripple
