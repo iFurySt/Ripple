@@ -131,6 +131,13 @@ func (r *Repository) clone() error {
 	cmd := exec.Command("git", "clone", "-b", r.branch, r.repoURL, repoName)
 	cmd.Dir = r.workspaceDir
 	
+	r.logger.Info("Starting to clone repository",
+		zap.String("url", r.repoURL),
+		zap.String("branch", r.branch),
+		zap.String("repo_name", repoName),
+		zap.String("workspace_dir", r.workspaceDir),
+		zap.Bool("is_ssh", r.isSSHURL(r.repoURL)))
+	
 	// Set up environment for SSH operations
 	if r.isSSHURL(r.repoURL) {
 		r.setupSSHEnvironment(cmd)
@@ -138,6 +145,10 @@ func (r *Repository) clone() error {
 	
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		r.logger.Error("Failed to clone repository",
+			zap.String("url", r.repoURL),
+			zap.String("error", err.Error()),
+			zap.String("output", string(output)))
 		return fmt.Errorf("failed to clone repository: %s, output: %s", err, string(output))
 	}
 
@@ -439,9 +450,11 @@ func (r *Repository) setupSSHEnvironment(cmd *exec.Cmd) {
 	}
 	
 	// Set Git SSH command to use SSH with specific options
-	sshCommand := "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+	// We respect the user's SSH config, only disable strict host checking for convenience
+	sshCommand := "ssh -o StrictHostKeyChecking=no"
 	cmd.Env = append(cmd.Env, "GIT_SSH_COMMAND="+sshCommand)
 	
-	r.logger.Debug("SSH environment configured for git command",
+	r.logger.Info("SSH environment configured for git command",
+		zap.String("url", r.repoURL),
 		zap.String("ssh_command", sshCommand))
 }
