@@ -131,6 +131,11 @@ func (r *Repository) clone() error {
 	cmd := exec.Command("git", "clone", "-b", r.branch, r.repoURL, repoName)
 	cmd.Dir = r.workspaceDir
 	
+	// Set up environment for SSH operations
+	if r.isSSHURL(r.repoURL) {
+		r.setupSSHEnvironment(cmd)
+	}
+	
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to clone repository: %s, output: %s", err, string(output))
@@ -153,6 +158,11 @@ func (r *Repository) pull() error {
 
 	cmd := exec.Command("git", "pull", "origin", r.branch)
 	cmd.Dir = r.localPath
+	
+	// Set up environment for SSH operations
+	if r.isSSHURL(r.repoURL) {
+		r.setupSSHEnvironment(cmd)
+	}
 	
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -186,14 +196,20 @@ func (r *Repository) checkoutBranch(branch string) error {
 // createBranchFromRemote creates a local branch tracking the remote branch
 func (r *Repository) createBranchFromRemote(branch string) error {
 	// Fetch latest refs
-	cmd := exec.Command("git", "fetch", "origin")
-	cmd.Dir = r.localPath
-	if err := cmd.Run(); err != nil {
+	fetchCmd := exec.Command("git", "fetch", "origin")
+	fetchCmd.Dir = r.localPath
+	
+	// Set up environment for SSH operations
+	if r.isSSHURL(r.repoURL) {
+		r.setupSSHEnvironment(fetchCmd)
+	}
+	
+	if err := fetchCmd.Run(); err != nil {
 		return fmt.Errorf("failed to fetch from origin: %w", err)
 	}
 
 	// Create and checkout branch from remote
-	cmd = exec.Command("git", "checkout", "-b", branch, "origin/"+branch)
+	cmd := exec.Command("git", "checkout", "-b", branch, "origin/"+branch)
 	cmd.Dir = r.localPath
 	
 	output, err := cmd.CombinedOutput()
@@ -289,6 +305,11 @@ func (r *Repository) Push() error {
 	cmd := exec.Command("git", "push", "origin", r.branch)
 	cmd.Dir = r.localPath
 	
+	// Set up environment for SSH operations
+	if r.isSSHURL(r.repoURL) {
+		r.setupSSHEnvironment(cmd)
+	}
+	
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to push: %s, output: %s", err, string(output))
@@ -381,11 +402,46 @@ func extractRepoName(url string) string {
 		url = strings.TrimSuffix(url, ".git")
 	}
 	
-	// Get the last part of the URL
+	// Handle SSH URLs (git@github.com:user/repo)
+	if strings.Contains(url, ":") && strings.Contains(url, "@") {
+		// Split by colon and get the last part
+		parts := strings.Split(url, ":")
+		if len(parts) > 1 {
+			path := parts[len(parts)-1]
+			// Get the repository name (last part after /)
+			pathParts := strings.Split(path, "/")
+			if len(pathParts) > 0 {
+				return pathParts[len(pathParts)-1]
+			}
+		}
+	}
+	
+	// Get the last part of the URL for HTTPS URLs
 	parts := strings.Split(url, "/")
 	if len(parts) > 0 {
 		return parts[len(parts)-1]
 	}
 	
 	return "repo"
+}
+
+// isSSHURL checks if the given URL is an SSH URL
+func (r *Repository) isSSHURL(url string) bool {
+	return strings.HasPrefix(url, "git@") || strings.HasPrefix(url, "ssh://")
+}
+
+// setupSSHEnvironment sets up the SSH environment for git commands
+func (r *Repository) setupSSHEnvironment(cmd *exec.Cmd) {
+	// Set up SSH options to handle host key verification
+	// This will automatically accept unknown host keys (be careful in production)
+	if cmd.Env == nil {
+		cmd.Env = os.Environ()
+	}
+	
+	// Set Git SSH command to use SSH with specific options
+	sshCommand := "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+	cmd.Env = append(cmd.Env, "GIT_SSH_COMMAND="+sshCommand)
+	
+	r.logger.Debug("SSH environment configured for git command",
+		zap.String("ssh_command", sshCommand))
 }
