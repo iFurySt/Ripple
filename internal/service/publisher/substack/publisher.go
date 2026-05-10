@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ifuryst/ripple/internal/service/publisher"
@@ -90,6 +91,19 @@ type SubstackDraftResponse struct {
 	ShouldSendEmail bool             `json:"should_send_email"`
 	Audience        string           `json:"audience"`
 	DraftBylines    []SubstackByline `json:"draft_bylines"`
+}
+
+type SubstackPublicationTag struct {
+	ID            int    `json:"id"`
+	Name          string `json:"name"`
+	Slug          string `json:"slug"`
+	CanonicalName string `json:"canonical_name"`
+}
+
+type SubstackPostTag struct {
+	ID        int `json:"id"`
+	PostID    int `json:"post_id"`
+	PostTagID int `json:"post_tag_id"`
 }
 
 func NewSubstackPublisher(logger *zap.Logger) publisher.Publisher {
@@ -272,6 +286,16 @@ func (p *SubstackPublisher) SaveToDraft(ctx context.Context, content publisher.P
 
 	// Store draft ID for image processing
 	transformedContent.Metadata["draft_id"] = fmt.Sprintf("%d", draftResponse.ID)
+
+	if err := p.applyTags(ctx, draftResponse.ID, transformedContent.Tags); err != nil {
+		tagErr := fmt.Errorf("failed to apply Substack tags: %w", err)
+		p.logger.Error("Failed to apply Substack tags", zap.Error(tagErr))
+		return &publisher.PublishResult{
+			Success:  false,
+			Error:    tagErr,
+			ErrorMsg: tagErr.Error(),
+		}, nil
+	}
 
 	// Process resources (images) now that we have a draft ID
 	p.logger.Debug("Processing resources",
@@ -586,6 +610,254 @@ func (p *SubstackPublisher) updateDraft(ctx context.Context, draftID int, reques
 	}
 
 	return nil
+}
+
+func (p *SubstackPublisher) applyTags(ctx context.Context, postID int, tags []string) error {
+	desiredTags := normalizeSubstackTagNames(tags)
+	if len(desiredTags) == 0 {
+		return nil
+	}
+
+	publicationTags, err := p.getPublicationTags(ctx)
+	if err != nil {
+		return err
+	}
+
+	postTags, err := p.getPostTags(ctx, postID)
+	if err != nil {
+		return err
+	}
+
+	attachedTagIDs := make(map[int]struct{}, len(postTags))
+	for _, postTag := range postTags {
+		if postTag.PostTagID != 0 {
+			attachedTagIDs[postTag.PostTagID] = struct{}{}
+		}
+	}
+
+	for _, tagName := range desiredTags {
+		tag := findSubstackTag(publicationTags, tagName)
+		if tag == nil {
+			createdTag, err := p.createPublicationTag(ctx, tagName)
+			if err != nil {
+				return fmt.Errorf("failed to create tag %q: %w", tagName, err)
+			}
+			tag = createdTag
+			publicationTags = append(publicationTags, *createdTag)
+		}
+		if tag.ID == 0 {
+			return fmt.Errorf("tag %q did not include an id", tagName)
+		}
+
+		if _, exists := attachedTagIDs[tag.ID]; exists {
+			continue
+		}
+
+		if err := p.attachPostTag(ctx, postID, tag.ID); err != nil {
+			return fmt.Errorf("failed to attach tag %q: %w", tagName, err)
+		}
+		attachedTagIDs[tag.ID] = struct{}{}
+	}
+
+	p.logger.Info("Applied Substack tags",
+		zap.Int("draft_id", postID),
+		zap.Strings("tags", desiredTags))
+
+	return nil
+}
+
+func normalizeSubstackTagNames(tags []string) []string {
+	seen := make(map[string]struct{}, len(tags))
+	normalizedTags := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		trimmed := strings.TrimSpace(tag)
+		if trimmed == "" {
+			continue
+		}
+
+		key := normalizeSubstackTagKey(trimmed)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+
+		seen[key] = struct{}{}
+		normalizedTags = append(normalizedTags, trimmed)
+	}
+	return normalizedTags
+}
+
+func findSubstackTag(tags []SubstackPublicationTag, name string) *SubstackPublicationTag {
+	nameKey := normalizeSubstackTagKey(name)
+	for i := range tags {
+		for _, candidate := range []string{tags[i].Name, tags[i].CanonicalName, tags[i].Slug} {
+			if normalizeSubstackTagKey(candidate) == nameKey {
+				return &tags[i]
+			}
+		}
+	}
+	return nil
+}
+
+func normalizeSubstackTagKey(tag string) string {
+	return strings.ToLower(strings.TrimSpace(tag))
+}
+
+func (p *SubstackPublisher) getPublicationTags(ctx context.Context) ([]SubstackPublicationTag, error) {
+	url := fmt.Sprintf("https://%s/api/v1/publication/post-tag", p.domain)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	p.setSubstackAPIHeaders(req, "")
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var tags []SubstackPublicationTag
+	if err := json.Unmarshal(body, &tags); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return tags, nil
+}
+
+func (p *SubstackPublisher) createPublicationTag(ctx context.Context, name string) (*SubstackPublicationTag, error) {
+	url := fmt.Sprintf("https://%s/api/v1/publication/post-tag", p.domain)
+
+	jsonData, err := json.Marshal(map[string]string{"name": name})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal tag request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	p.setSubstackAPIHeaders(req, "")
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var tag SubstackPublicationTag
+	if err := json.Unmarshal(body, &tag); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	if tag.ID == 0 {
+		tags, err := p.getPublicationTags(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if existingTag := findSubstackTag(tags, name); existingTag != nil {
+			return existingTag, nil
+		}
+	}
+
+	return &tag, nil
+}
+
+func (p *SubstackPublisher) getPostTags(ctx context.Context, postID int) ([]SubstackPostTag, error) {
+	url := fmt.Sprintf("https://%s/api/v1/post/%d/tag", p.domain, postID)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	p.setSubstackAPIHeaders(req, fmt.Sprintf("https://%s/publish/post/%d", p.domain, postID))
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var tags []SubstackPostTag
+	if err := json.Unmarshal(body, &tags); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return tags, nil
+}
+
+func (p *SubstackPublisher) attachPostTag(ctx context.Context, postID, tagID int) error {
+	url := fmt.Sprintf("https://%s/api/v1/post/%d/tag/%d", p.domain, postID, tagID)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	p.setSubstackAPIHeaders(req, fmt.Sprintf("https://%s/publish/post/%d", p.domain, postID))
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+func (p *SubstackPublisher) setSubstackAPIHeaders(req *http.Request, referer string) {
+	if referer == "" {
+		referer = fmt.Sprintf("https://%s/publish/post", p.domain)
+	}
+
+	req.Header.Set("Cookie", p.cookie)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Accept-Language", "en,zh-CN;q=0.9,zh;q=0.8")
+	req.Header.Set("Origin", fmt.Sprintf("https://%s", p.domain))
+	req.Header.Set("Referer", referer)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
+	req.Header.Set("Sec-Ch-Ua", `"Not)A;Brand";v="8", "Chromium";v="138", "Google Chrome";v="138"`)
+	req.Header.Set("Sec-Ch-Ua-Mobile", "?0")
+	req.Header.Set("Sec-Ch-Ua-Platform", `"macOS"`)
+	req.Header.Set("Sec-Fetch-Dest", "empty")
+	req.Header.Set("Sec-Fetch-Mode", "cors")
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
 }
 
 func (p *SubstackPublisher) uploadImage(ctx context.Context, imageURL string, postID int) (string, error) {
