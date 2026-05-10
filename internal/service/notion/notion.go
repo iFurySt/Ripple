@@ -119,6 +119,7 @@ func (s *Service) processPage(page PageResponse) error {
 	owner := s.extractOwner(page.Properties)
 	platforms := s.extractPlatforms(page.Properties)
 	contentType := s.extractContentType(page.Properties)
+	platforms = routePlatformsForContentType(platforms, contentType)
 
 	// Serialize properties
 	propertiesJSON, err := json.Marshal(page.Properties)
@@ -166,7 +167,7 @@ func (s *Service) processPage(page PageResponse) error {
 	} else {
 		// Check if we need to force refresh content (for image link expiration)
 		needsContentRefresh := s.shouldRefreshContent(existingPage)
-		
+
 		// Update existing page if modified or needs content refresh
 		if existingPage.LastModified.Before(lastModified) || needsContentRefresh {
 			existingPage.Title = title
@@ -196,10 +197,20 @@ func (s *Service) processPage(page PageResponse) error {
 	return nil
 }
 
+func routePlatformsForContentType(platforms models.StringArray, contentType models.StringArray) models.StringArray {
+	for _, item := range contentType {
+		if strings.EqualFold(strings.TrimSpace(item), "HNDailyReport") {
+			return models.StringArray{"Email"}
+		}
+	}
+
+	return platforms
+}
+
 func (s *Service) shouldRefreshContent(existingPage models.NotionPage) bool {
 	// Force refresh if content is older than 4 hours (image links typically expire in 1-24 hours)
 	refreshThreshold := time.Now().Add(-4 * time.Hour)
-	
+
 	// Check if page was last updated more than 4 hours ago
 	if existingPage.UpdatedAt.Before(refreshThreshold) {
 		// Check if content contains AWS image URLs that might expire
@@ -207,7 +218,7 @@ func (s *Service) shouldRefreshContent(existingPage models.NotionPage) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -220,13 +231,13 @@ func (s *Service) containsAWSImageURLs(content string) bool {
 		"?X-Amz-Algorithm=",
 		"?X-Amz-Credential=",
 	}
-	
+
 	for _, pattern := range awsPatterns {
 		if strings.Contains(content, pattern) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -256,7 +267,7 @@ func (s *Service) GetAllPages() ([]models.NotionPage, error) {
 // UpdatePageStatus updates the status property of a Notion page
 func (s *Service) UpdatePageStatus(pageID, status string) error {
 	url := fmt.Sprintf("https://api.notion.com/v1/pages/%s", pageID)
-	
+
 	payload := map[string]interface{}{
 		"properties": map[string]interface{}{
 			"Status": map[string]interface{}{
@@ -295,7 +306,7 @@ func (s *Service) UpdatePageStatus(pageID, status string) error {
 	// Read response body for debugging
 	bodyBytes, readErr := ioutil.ReadAll(resp.Body)
 	if readErr == nil {
-		s.logger.Debug("Notion API response", 
+		s.logger.Debug("Notion API response",
 			zap.Int("status_code", resp.StatusCode),
 			zap.String("response_body", string(bodyBytes)))
 	}

@@ -12,18 +12,19 @@ import (
 	"github.com/ifuryst/ripple/internal/service/notion"
 	"github.com/ifuryst/ripple/internal/service/publisher"
 	"github.com/ifuryst/ripple/internal/service/publisher/al_folio"
+	emailpublisher "github.com/ifuryst/ripple/internal/service/publisher/email"
 	"github.com/ifuryst/ripple/internal/service/publisher/substack"
 	"github.com/ifuryst/ripple/internal/service/publisher/wechat_official"
 )
 
 // PublisherService manages content publishing to various platforms
 type PublisherService struct {
-	logger             *zap.Logger
-	db                 *gorm.DB
-	config             *config.Config
-	manager            *publisher.Manager
-	monitoringService  *MonitoringService
-	notionService      *notion.Service
+	logger            *zap.Logger
+	db                *gorm.DB
+	config            *config.Config
+	manager           *publisher.Manager
+	monitoringService *MonitoringService
+	notionService     *notion.Service
 }
 
 func NewPublisherService(cfg *config.Config, db *gorm.DB, logger *zap.Logger, notionService *notion.Service) *PublisherService {
@@ -80,11 +81,11 @@ func (s *PublisherService) registerPublishers() {
 				PlatformName: "wechat-official",
 				Enabled:      s.config.Publisher.WeChatOfficial.Enabled,
 				Config: map[string]string{
-					"app_id":                s.config.Publisher.WeChatOfficial.AppID,
-					"app_secret":            s.config.Publisher.WeChatOfficial.AppSecret,
-					"auto_publish":          fmt.Sprintf("%t", s.config.Publisher.WeChatOfficial.AutoPublish),
-					"need_open_comment":     fmt.Sprintf("%d", s.config.Publisher.WeChatOfficial.NeedOpenComment),
-					"only_fans_can_comment": fmt.Sprintf("%d", s.config.Publisher.WeChatOfficial.OnlyFansCanComment),
+					"app_id":                 s.config.Publisher.WeChatOfficial.AppID,
+					"app_secret":             s.config.Publisher.WeChatOfficial.AppSecret,
+					"auto_publish":           fmt.Sprintf("%t", s.config.Publisher.WeChatOfficial.AutoPublish),
+					"need_open_comment":      fmt.Sprintf("%d", s.config.Publisher.WeChatOfficial.NeedOpenComment),
+					"only_fans_can_comment":  fmt.Sprintf("%d", s.config.Publisher.WeChatOfficial.OnlyFansCanComment),
 					"default_thumb_media_id": s.config.Publisher.WeChatOfficial.DefaultThumbMediaID,
 				},
 			}
@@ -111,6 +112,28 @@ func (s *PublisherService) registerPublishers() {
 			}
 			s.manager.SetPlatformConfig("substack", cfg)
 			s.logger.Info("Substack publisher registered and configured")
+		}
+	}
+
+	// Register Email Publisher
+	if s.config.Publisher.Email.Enabled {
+		emailPublisher := emailpublisher.NewPublisher(s.logger)
+		if err := s.manager.RegisterPublisher(emailPublisher); err != nil {
+			s.logger.Error("Failed to register Email publisher", zap.Error(err))
+		} else {
+			cfg := publisher.PublishConfig{
+				PlatformName: "email",
+				Enabled:      s.config.Publisher.Email.Enabled,
+				Config: map[string]string{
+					"provider":       s.config.Publisher.Email.Provider,
+					"resend_api_key": s.config.Publisher.Email.ResendAPIKey,
+					"from":           s.config.Publisher.Email.From,
+					"to":             s.config.Publisher.Email.To,
+					"auto_publish":   fmt.Sprintf("%t", s.config.Publisher.Email.AutoPublish),
+				},
+			}
+			s.manager.SetPlatformConfig("email", cfg)
+			s.logger.Info("Email publisher registered and configured")
 		}
 	}
 }
@@ -231,7 +254,6 @@ func (s *PublisherService) PublishPageToPlatform(ctx context.Context, pageID str
 
 	return result, nil
 }
-
 
 // SavePageToDraft saves a page as draft to a specific platform
 func (s *PublisherService) SavePageToDraft(ctx context.Context, pageID string, platformName string) (*publisher.PublishResult, error) {
@@ -377,7 +399,14 @@ func (s *PublisherService) needsPublishing(ctx context.Context, page *models.Not
 
 	// Check if all required platforms are completed
 	for _, platformName := range page.Platforms {
-		status, exists := platformStatus[platformName]
+		systemPlatformName := s.manager.MapPlatformName(platformName)
+		if systemPlatformName == "" {
+			s.logger.Warn("Unknown platform name in needsPublishing",
+				zap.String("notion_platform", platformName))
+			return true, nil
+		}
+
+		status, exists := platformStatus[systemPlatformName]
 		if !exists || (status != "completed") {
 			// Platform either has no job or job is not completed
 			return true, nil
@@ -407,11 +436,11 @@ func (s *PublisherService) checkAllPlatformsCompleted(ctx context.Context, page 
 		// Map the Notion platform name to the system platform name
 		systemPlatformName := s.manager.MapPlatformName(notionPlatformName)
 		if systemPlatformName == "" {
-			s.logger.Warn("Unknown platform name in checkAllPlatformsCompleted", 
+			s.logger.Warn("Unknown platform name in checkAllPlatformsCompleted",
 				zap.String("notion_platform", notionPlatformName))
 			return false, nil
 		}
-		
+
 		status, exists := platformStatus[systemPlatformName]
 		if !exists || status != "completed" {
 			s.logger.Debug("Platform not completed",
@@ -446,6 +475,6 @@ func (s *PublisherService) updateNotionPageStatus(ctx context.Context, notionID 
 	if err := s.notionService.UpdatePageStatus(notionID, status); err != nil {
 		return fmt.Errorf("failed to update Notion page status: %w", err)
 	}
-	
+
 	return nil
 }

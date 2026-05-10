@@ -49,6 +49,7 @@ type PublisherConfig struct {
 	AlFolio        AlFolioConfig        `yaml:"al_folio"`
 	WeChatOfficial WeChatOfficialConfig `yaml:"wechat_official"`
 	Substack       SubstackConfig       `yaml:"substack"`
+	Email          EmailConfig          `yaml:"email"`
 }
 
 type AlFolioConfig struct {
@@ -64,12 +65,12 @@ type AlFolioConfig struct {
 }
 
 type WeChatOfficialConfig struct {
-	Enabled            bool   `yaml:"enabled"`
-	AppID              string `yaml:"app_id"`
-	AppSecret          string `yaml:"app_secret"`
-	AutoPublish        bool   `yaml:"auto_publish"`
-	NeedOpenComment    int    `yaml:"need_open_comment"`
-	OnlyFansCanComment int    `yaml:"only_fans_can_comment"`
+	Enabled             bool   `yaml:"enabled"`
+	AppID               string `yaml:"app_id"`
+	AppSecret           string `yaml:"app_secret"`
+	AutoPublish         bool   `yaml:"auto_publish"`
+	NeedOpenComment     int    `yaml:"need_open_comment"`
+	OnlyFansCanComment  int    `yaml:"only_fans_can_comment"`
 	DefaultThumbMediaID string `yaml:"default_thumb_media_id"`
 }
 
@@ -78,6 +79,15 @@ type SubstackConfig struct {
 	Domain      string `yaml:"domain"`
 	Cookie      string `yaml:"cookie"`
 	AutoPublish bool   `yaml:"auto_publish"`
+}
+
+type EmailConfig struct {
+	Enabled      bool   `yaml:"enabled"`
+	Provider     string `yaml:"provider"`
+	ResendAPIKey string `yaml:"resend_api_key"`
+	From         string `yaml:"from"`
+	To           string `yaml:"to"`
+	AutoPublish  bool   `yaml:"auto_publish"`
 }
 
 type AuthConfig struct {

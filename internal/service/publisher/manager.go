@@ -148,14 +148,14 @@ func (m *Manager) PublishToPlatforms(ctx context.Context, page *models.NotionPag
 
 		// Check if this platform already has a completed job
 		var existingJob models.DistributionJob
-		if err := m.db.Where("page_id = ? AND platform_id = ? AND status = ?", 
+		if err := m.db.Where("page_id = ? AND platform_id = ? AND status = ?",
 			page.ID, platformID, "completed").First(&existingJob).Error; err == nil {
 			// Job already completed, skip
 			m.logger.Info("Platform already completed, skipping",
 				zap.String("platform", platformName),
 				zap.Uint("page_id", page.ID))
 			results[platformName] = &PublishResult{
-				Success: true,
+				Success:   true,
 				PublishID: fmt.Sprintf("existing-job-%d", existingJob.ID),
 			}
 			continue
@@ -393,18 +393,21 @@ func (m *Manager) MapPlatformName(notionPlatform string) string {
 func (m *Manager) mapPlatformName(notionPlatform string) string {
 	// Map Notion platform names to system platform names
 	platformMap := map[string]string{
-		"Blog":       "al-folio",
-		"blog":       "al-folio",
-		"Jekyll":     "al-folio",
-		"jekyll":     "al-folio",
-		"微信公众号": "wechat-official",
-		"微信公众号短文": "wechat-official",
-		"WeChat":     "wechat-official",
-		"wechat":     "wechat-official",
-		"Substack":   "substack",
-		"substack":   "substack",
+		"Blog":     "al-folio",
+		"blog":     "al-folio",
+		"Jekyll":   "al-folio",
+		"jekyll":   "al-folio",
+		"微信公众号":    "wechat-official",
+		"微信公众号短文":  "wechat-official",
+		"WeChat":   "wechat-official",
+		"wechat":   "wechat-official",
+		"Substack": "substack",
+		"substack": "substack",
+		"Email":    "email",
+		"email":    "email",
+		"邮件":       "email",
 		// Direct matches (already using system names)
-		"al-folio":     "al-folio",
+		"al-folio":        "al-folio",
 		"wechat-official": "wechat-official",
 	}
 

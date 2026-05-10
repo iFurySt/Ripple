@@ -54,6 +54,13 @@ publisher:
     domain: "${SUBSTACK_DOMAIN:}"
     cookie: "${SUBSTACK_COOKIE:}"
     auto_publish: ${SUBSTACK_AUTO_PUBLISH:false}
+  email:
+    enabled: ${EMAIL_ENABLED:false}
+    provider: "${EMAIL_PROVIDER:resend}"
+    resend_api_key: "${RESEND_API_KEY:}"
+    from: "${EMAIL_FROM:}"
+    to: "${EMAIL_TO:}"
+    auto_publish: ${EMAIL_AUTO_PUBLISH:true}
 
 auth:
   enabled: ${AUTH_ENABLED:true}
