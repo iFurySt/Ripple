@@ -44,3 +44,19 @@ func TestLooksLikeNotionBlocks(t *testing.T) {
 		t.Fatal("expected HTML not to be detected as Notion blocks")
 	}
 }
+
+func TestWrapEmailHTMLUsesDigestLayout(t *testing.T) {
+	body := `<ul><li>Story</li></ul>`
+	rendered := wrapEmailHTML("LeoTalk · Hacker News Daily · 2026.05.10", body)
+
+	for _, want := range []string{
+		"LeoTalk Digest",
+		"Daily Hacker News highlights",
+		"Sent by Ripple via Resend",
+		body,
+	} {
+		if !strings.Contains(rendered, want) {
+			t.Fatalf("expected wrapped email to contain %q, got: %s", want, rendered)
+		}
+	}
+}
