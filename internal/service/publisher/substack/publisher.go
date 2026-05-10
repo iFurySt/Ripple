@@ -94,16 +94,16 @@ type SubstackDraftResponse struct {
 }
 
 type SubstackPublicationTag struct {
-	ID            int    `json:"id"`
+	ID            string `json:"id"`
 	Name          string `json:"name"`
 	Slug          string `json:"slug"`
 	CanonicalName string `json:"canonical_name"`
 }
 
 type SubstackPostTag struct {
-	ID        int `json:"id"`
-	PostID    int `json:"post_id"`
-	PostTagID int `json:"post_tag_id"`
+	ID        string `json:"id"`
+	PostID    int    `json:"post_id"`
+	PostTagID string `json:"post_tag_id"`
 }
 
 func NewSubstackPublisher(logger *zap.Logger) publisher.Publisher {
@@ -628,9 +628,9 @@ func (p *SubstackPublisher) applyTags(ctx context.Context, postID int, tags []st
 		return err
 	}
 
-	attachedTagIDs := make(map[int]struct{}, len(postTags))
+	attachedTagIDs := make(map[string]struct{}, len(postTags))
 	for _, postTag := range postTags {
-		if postTag.PostTagID != 0 {
+		if postTag.PostTagID != "" {
 			attachedTagIDs[postTag.PostTagID] = struct{}{}
 		}
 	}
@@ -645,7 +645,7 @@ func (p *SubstackPublisher) applyTags(ctx context.Context, postID int, tags []st
 			tag = createdTag
 			publicationTags = append(publicationTags, *createdTag)
 		}
-		if tag.ID == 0 {
+		if tag.ID == "" {
 			return fmt.Errorf("tag %q did not include an id", tagName)
 		}
 
@@ -771,7 +771,7 @@ func (p *SubstackPublisher) createPublicationTag(ctx context.Context, name strin
 		return nil, fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	if tag.ID == 0 {
+	if tag.ID == "" {
 		tags, err := p.getPublicationTags(ctx)
 		if err != nil {
 			return nil, err
@@ -817,8 +817,8 @@ func (p *SubstackPublisher) getPostTags(ctx context.Context, postID int) ([]Subs
 	return tags, nil
 }
 
-func (p *SubstackPublisher) attachPostTag(ctx context.Context, postID, tagID int) error {
-	url := fmt.Sprintf("https://%s/api/v1/post/%d/tag/%d", p.domain, postID, tagID)
+func (p *SubstackPublisher) attachPostTag(ctx context.Context, postID int, tagID string) error {
+	url := fmt.Sprintf("https://%s/api/v1/post/%d/tag/%s", p.domain, postID, tagID)
 
 	req, err := http.NewRequestWithContext(ctx, "POST", url, nil)
 	if err != nil {
