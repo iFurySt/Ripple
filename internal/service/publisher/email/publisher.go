@@ -86,6 +86,14 @@ func (p *Publisher) PublishDirect(ctx context.Context, content publisher.Publish
 		}
 	}
 
+	if looksLikeNotionBlocks(content.Content) {
+		transformed, err := p.TransformContent(ctx, content)
+		if err != nil {
+			return nil, err
+		}
+		content = *transformed
+	}
+
 	params := &resend.SendEmailRequest{
 		From:    config.Config["from"],
 		To:      parseRecipients(config.Config["to"]),

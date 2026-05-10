@@ -1,6 +1,12 @@
 package email
 
-import "testing"
+import (
+	"context"
+	"strings"
+	"testing"
+
+	"github.com/ifuryst/ripple/internal/service/publisher"
+)
 
 func TestParseRecipients(t *testing.T) {
 	recipients := parseRecipients("a@example.com, b@example.com;c@example.com\n")
@@ -9,5 +15,32 @@ func TestParseRecipients(t *testing.T) {
 	}
 	if recipients[0] != "a@example.com" || recipients[1] != "b@example.com" || recipients[2] != "c@example.com" {
 		t.Fatalf("unexpected recipients: %#v", recipients)
+	}
+}
+
+func TestPublishDirectTransformsNotionBlocksBeforeSending(t *testing.T) {
+	content := publisher.PublishContent{
+		Title:   "Test",
+		Content: `[{"object":"block","type":"paragraph","paragraph":{"rich_text":[{"type":"text","plain_text":"hello","href":null,"annotations":{},"text":{"content":"hello"}}]}}]`,
+	}
+
+	transformed, err := (&Publisher{}).TransformContent(context.Background(), content)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(transformed.Content, `"object":"block"`) {
+		t.Fatalf("expected transformed HTML, got raw blocks: %s", transformed.Content)
+	}
+	if !strings.Contains(transformed.Content, "hello") {
+		t.Fatalf("expected transformed content to include text, got: %s", transformed.Content)
+	}
+}
+
+func TestLooksLikeNotionBlocks(t *testing.T) {
+	if !looksLikeNotionBlocks(`[{"type":"paragraph","paragraph":{}}]`) {
+		t.Fatal("expected Notion blocks JSON to be detected")
+	}
+	if looksLikeNotionBlocks(`<p>already html</p>`) {
+		t.Fatal("expected HTML not to be detected as Notion blocks")
 	}
 }

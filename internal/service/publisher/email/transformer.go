@@ -7,6 +7,20 @@ import (
 	"strings"
 )
 
+func looksLikeNotionBlocks(content string) bool {
+	trimmed := strings.TrimSpace(content)
+	if !strings.HasPrefix(trimmed, "[") {
+		return false
+	}
+
+	var blocks []map[string]any
+	if err := json.Unmarshal([]byte(trimmed), &blocks); err != nil {
+		return false
+	}
+
+	return len(blocks) > 0
+}
+
 func convertNotionBlocksToEmailHTML(blocksJSON string) (string, error) {
 	var blocks []map[string]any
 	if err := json.Unmarshal([]byte(blocksJSON), &blocks); err != nil {
