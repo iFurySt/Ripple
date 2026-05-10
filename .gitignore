@@ -38,3 +38,4 @@ workspace/
 
 node_modules/
 dist/
+.idea
