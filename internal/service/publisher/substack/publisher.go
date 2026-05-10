@@ -317,8 +317,11 @@ func (p *SubstackPublisher) SaveToDraft(ctx context.Context, content publisher.P
 		}
 
 		draftBylines := latestDraft.DraftBylines
-		if len(draftBylines) == 0 {
+		if draftBylines == nil && draftResponse.DraftBylines != nil {
 			draftBylines = draftResponse.DraftBylines
+		}
+		if draftBylines == nil {
+			draftBylines = []SubstackByline{}
 		}
 
 		updateRequest := SubstackUpdateDraftRequest{
