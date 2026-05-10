@@ -17,8 +17,8 @@ type SubstackTransformer struct {
 
 // SubstackDocument represents Substack's document structure
 type SubstackDocument struct {
-	Type    string               `json:"type"`
-	Content []SubstackNode       `json:"content"`
+	Type    string         `json:"type"`
+	Content []SubstackNode `json:"content"`
 }
 
 type SubstackNode struct {
@@ -46,7 +46,7 @@ func (t *SubstackTransformer) Transform(ctx context.Context, content string) (st
 	if err != nil {
 		return "", fmt.Errorf("failed to convert Notion blocks to Substack format: %w", err)
 	}
-	
+
 	// Serialize to JSON string
 	jsonBytes, err := json.Marshal(document)
 	if err != nil {
@@ -58,7 +58,7 @@ func (t *SubstackTransformer) Transform(ctx context.Context, content string) (st
 
 func (t *SubstackTransformer) ExtractImages(content string) []string {
 	var imageURLs []string
-	
+
 	// Try to parse as Notion blocks JSON first
 	var blocks []map[string]any
 	if err := json.Unmarshal([]byte(content), &blocks); err == nil {
@@ -82,7 +82,7 @@ func (t *SubstackTransformer) ExtractImages(content string) []string {
 			}
 		}
 	}
-	
+
 	return imageURLs
 }
 
@@ -106,17 +106,20 @@ func (t *SubstackTransformer) extractImageURLFromBlock(blockContent map[string]a
 
 func (t *SubstackTransformer) UpdateImageReferences(content string, resources []publisher.Resource) string {
 	result := content
-	
+
 	for _, resource := range resources {
 		if resource.Type == publisher.ResourceTypeImage && resource.Metadata["uploaded_url"] != "" {
 			originalURL := resource.Metadata["original_url"]
 			uploadedURL := resource.Metadata["uploaded_url"]
-			
+
 			// Update image references in the JSON content
 			result = strings.ReplaceAll(result, originalURL, uploadedURL)
+			if encodedOriginalURL, err := json.Marshal(originalURL); err == nil {
+				result = strings.ReplaceAll(result, strings.Trim(string(encodedOriginalURL), `"`), uploadedURL)
+			}
 		}
 	}
-	
+
 	return result
 }
 
@@ -486,24 +489,24 @@ func (t *SubstackTransformer) convertImageBlockToSubstack(blockContent map[strin
 				{
 					Type: "image2",
 					Attrs: map[string]interface{}{
-						"src":                imageURL,
-						"srcNoWatermark":     nil,
-						"fullscreen":         nil,
-						"imageSize":          nil,
-						"height":             nil,
-						"width":              nil,
-						"resizeWidth":        nil,
-						"bytes":              nil,
-						"alt":                alt,
-						"title":              nil,
-						"type":               "image/png",
-						"href":               nil,
-						"belowTheFold":       false,
-						"topImage":           false,
-						"internalRedirect":   "",
-						"isProcessing":       false,
-						"align":              nil,
-						"offset":             false,
+						"src":              imageURL,
+						"srcNoWatermark":   nil,
+						"fullscreen":       nil,
+						"imageSize":        nil,
+						"height":           nil,
+						"width":            nil,
+						"resizeWidth":      nil,
+						"bytes":            nil,
+						"alt":              alt,
+						"title":            nil,
+						"type":             "image/png",
+						"href":             nil,
+						"belowTheFold":     false,
+						"topImage":         false,
+						"internalRedirect": "",
+						"isProcessing":     false,
+						"align":            nil,
+						"offset":           false,
 					},
 				},
 			},
@@ -512,4 +515,3 @@ func (t *SubstackTransformer) convertImageBlockToSubstack(blockContent map[strin
 
 	return SubstackNode{}
 }
-

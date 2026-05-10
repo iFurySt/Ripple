@@ -26,19 +26,19 @@ type SubstackPublisher struct {
 
 // Substack API request structures
 type SubstackCreateDraftRequest struct {
-	DraftTitle                      string                    `json:"draft_title"`
-	DraftSubtitle                   string                    `json:"draft_subtitle"`
-	DraftPodcastURL                 string                    `json:"draft_podcast_url"`
-	DraftPodcastDuration            *int                      `json:"draft_podcast_duration"`
-	DraftVideoUploadID              *int                      `json:"draft_video_upload_id"`
-	DraftPodcastUploadID            *int                      `json:"draft_podcast_upload_id"`
-	DraftPodcastPreviewUploadID     *int                      `json:"draft_podcast_preview_upload_id"`
-	DraftVoiceoverUploadID          *int                      `json:"draft_voiceover_upload_id"`
-	DraftBody                       string                    `json:"draft_body"`
-	SectionChosen                   bool                      `json:"section_chosen"`
-	DraftSectionID                  *int                      `json:"draft_section_id"`
-	DraftBylines                    []SubstackByline          `json:"draft_bylines"`
-	Audience                        string                    `json:"audience"`
+	DraftTitle                  string           `json:"draft_title"`
+	DraftSubtitle               string           `json:"draft_subtitle"`
+	DraftPodcastURL             string           `json:"draft_podcast_url"`
+	DraftPodcastDuration        *int             `json:"draft_podcast_duration"`
+	DraftVideoUploadID          *int             `json:"draft_video_upload_id"`
+	DraftPodcastUploadID        *int             `json:"draft_podcast_upload_id"`
+	DraftPodcastPreviewUploadID *int             `json:"draft_podcast_preview_upload_id"`
+	DraftVoiceoverUploadID      *int             `json:"draft_voiceover_upload_id"`
+	DraftBody                   string           `json:"draft_body"`
+	SectionChosen               bool             `json:"section_chosen"`
+	DraftSectionID              *int             `json:"draft_section_id"`
+	DraftBylines                []SubstackByline `json:"draft_bylines"`
+	Audience                    string           `json:"audience"`
 }
 
 type SubstackByline struct {
@@ -47,19 +47,19 @@ type SubstackByline struct {
 }
 
 type SubstackUpdateDraftRequest struct {
-	DraftTitle                      string                    `json:"draft_title"`
-	DraftSubtitle                   string                    `json:"draft_subtitle"`
-	DraftPodcastURL                 string                    `json:"draft_podcast_url"`
-	DraftPodcastDuration            *int                      `json:"draft_podcast_duration"`
-	DraftVideoUploadID              *int                      `json:"draft_video_upload_id"`
-	DraftPodcastUploadID            *int                      `json:"draft_podcast_upload_id"`
-	DraftPodcastPreviewUploadID     *int                      `json:"draft_podcast_preview_upload_id"`
-	DraftVoiceoverUploadID          *int                      `json:"draft_voiceover_upload_id"`
-	DraftBody                       string                    `json:"draft_body"`
-	SectionChosen                   bool                      `json:"section_chosen"`
-	DraftSectionID                  *int                      `json:"draft_section_id"`
-	DraftBylines                    []SubstackByline          `json:"draft_bylines"`
-	LastUpdatedAt                   string                    `json:"last_updated_at"`
+	DraftTitle                  string           `json:"draft_title"`
+	DraftSubtitle               string           `json:"draft_subtitle"`
+	DraftPodcastURL             string           `json:"draft_podcast_url"`
+	DraftPodcastDuration        *int             `json:"draft_podcast_duration"`
+	DraftVideoUploadID          *int             `json:"draft_video_upload_id"`
+	DraftPodcastUploadID        *int             `json:"draft_podcast_upload_id"`
+	DraftPodcastPreviewUploadID *int             `json:"draft_podcast_preview_upload_id"`
+	DraftVoiceoverUploadID      *int             `json:"draft_voiceover_upload_id"`
+	DraftBody                   string           `json:"draft_body"`
+	SectionChosen               bool             `json:"section_chosen"`
+	DraftSectionID              *int             `json:"draft_section_id"`
+	DraftBylines                []SubstackByline `json:"draft_bylines"`
+	LastUpdatedAt               string           `json:"last_updated_at"`
 }
 
 type SubstackImageUploadRequest struct {
@@ -77,19 +77,19 @@ type SubstackImageUploadResponse struct {
 }
 
 type SubstackDraftResponse struct {
-	ID                 int                 `json:"id"`
-	UUID               string              `json:"uuid"`
-	DraftTitle         string              `json:"draft_title"`
-	DraftSubtitle      string              `json:"draft_subtitle"`
-	DraftBody          string              `json:"draft_body"`
-	DraftCreatedAt     string              `json:"draft_created_at"`
-	DraftUpdatedAt     string              `json:"draft_updated_at"`
-	IsPublished        bool                `json:"is_published"`
-	PublicationID      int                 `json:"publication_id"`
-	Type               string              `json:"type"`
-	ShouldSendEmail    bool                `json:"should_send_email"`
-	Audience           string              `json:"audience"`
-	DraftBylines       []SubstackByline    `json:"draft_bylines"`
+	ID              int              `json:"id"`
+	UUID            string           `json:"uuid"`
+	DraftTitle      string           `json:"draft_title"`
+	DraftSubtitle   string           `json:"draft_subtitle"`
+	DraftBody       string           `json:"draft_body"`
+	DraftCreatedAt  string           `json:"draft_created_at"`
+	DraftUpdatedAt  string           `json:"draft_updated_at"`
+	IsPublished     bool             `json:"is_published"`
+	PublicationID   int              `json:"publication_id"`
+	Type            string           `json:"type"`
+	ShouldSendEmail bool             `json:"should_send_email"`
+	Audience        string           `json:"audience"`
+	DraftBylines    []SubstackByline `json:"draft_bylines"`
 }
 
 func NewSubstackPublisher(logger *zap.Logger) publisher.Publisher {
@@ -155,7 +155,7 @@ func (p *SubstackPublisher) TransformContent(ctx context.Context, content publis
 	result := content
 	result.Content = transformedContent
 	result.Resources = resources
-	
+
 	// Initialize Metadata if it's nil
 	if result.Metadata == nil {
 		result.Metadata = make(map[string]string)
@@ -187,7 +187,7 @@ func (p *SubstackPublisher) ProcessResources(ctx context.Context, content *publi
 			// Upload image to Substack
 			uploadedImageURL, err := p.uploadImage(ctx, resource.URL, postID)
 			if err != nil {
-				p.logger.Warn("Failed to upload image, skipping", 
+				p.logger.Warn("Failed to upload image, skipping",
 					zap.String("image_url", resource.URL),
 					zap.Error(err))
 				// Skip this image but continue with others
@@ -218,10 +218,10 @@ func (p *SubstackPublisher) ProcessResources(ctx context.Context, content *publi
 }
 
 func (p *SubstackPublisher) SaveToDraft(ctx context.Context, content publisher.PublishContent, config publisher.PublishConfig) (*publisher.PublishResult, error) {
-	p.logger.Debug("Starting SaveToDraft for Substack", 
+	p.logger.Debug("Starting SaveToDraft for Substack",
 		zap.String("title", content.Title),
 		zap.Int("resources_count", len(content.Resources)))
-		
+
 	// Transform content first
 	transformedContent, err := p.TransformContent(ctx, content)
 	if err != nil {
@@ -232,8 +232,8 @@ func (p *SubstackPublisher) SaveToDraft(ctx context.Context, content publisher.P
 			ErrorMsg: err.Error(),
 		}, nil
 	}
-	
-	p.logger.Debug("Content transformed successfully", 
+
+	p.logger.Debug("Content transformed successfully",
 		zap.Int("transformed_resources_count", len(transformedContent.Resources)))
 
 	// Use English title as subtitle if available, otherwise fall back to summary
@@ -244,19 +244,19 @@ func (p *SubstackPublisher) SaveToDraft(ctx context.Context, content publisher.P
 
 	// Create draft request
 	draftRequest := SubstackCreateDraftRequest{
-		DraftTitle:                      transformedContent.Title,
-		DraftSubtitle:                   subtitle,
-		DraftPodcastURL:                 "",
-		DraftPodcastDuration:            nil,
-		DraftVideoUploadID:              nil,
-		DraftPodcastUploadID:            nil,
-		DraftPodcastPreviewUploadID:     nil,
-		DraftVoiceoverUploadID:          nil,
-		DraftBody:                       transformedContent.Content,
-		SectionChosen:                   false,
-		DraftSectionID:                  nil,
-		DraftBylines:                    []SubstackByline{}, // Will be populated by Substack
-		Audience:                        "everyone",
+		DraftTitle:                  transformedContent.Title,
+		DraftSubtitle:               subtitle,
+		DraftPodcastURL:             "",
+		DraftPodcastDuration:        nil,
+		DraftVideoUploadID:          nil,
+		DraftPodcastUploadID:        nil,
+		DraftPodcastPreviewUploadID: nil,
+		DraftVoiceoverUploadID:      nil,
+		DraftBody:                   transformedContent.Content,
+		SectionChosen:               false,
+		DraftSectionID:              nil,
+		DraftBylines:                []SubstackByline{}, // Will be populated by Substack
+		Audience:                    "everyone",
 	}
 
 	// Create draft
@@ -274,10 +274,10 @@ func (p *SubstackPublisher) SaveToDraft(ctx context.Context, content publisher.P
 	transformedContent.Metadata["draft_id"] = fmt.Sprintf("%d", draftResponse.ID)
 
 	// Process resources (images) now that we have a draft ID
-	p.logger.Debug("Processing resources", 
+	p.logger.Debug("Processing resources",
 		zap.Int("resource_count", len(transformedContent.Resources)),
 		zap.String("draft_id", transformedContent.Metadata["draft_id"]))
-		
+
 	if err := p.ProcessResources(ctx, transformedContent, config); err != nil {
 		p.logger.Error("Failed to process resources", zap.Error(err))
 		resourceErr := fmt.Errorf("failed to process resources: %w", err)
@@ -287,7 +287,7 @@ func (p *SubstackPublisher) SaveToDraft(ctx context.Context, content publisher.P
 			ErrorMsg: resourceErr.Error(),
 		}, nil
 	}
-	
+
 	// Get successful upload count from metadata
 	successfulUploads := 0
 	if successfulUploadsStr, ok := transformedContent.Metadata["successful_uploads"]; ok {
@@ -295,14 +295,59 @@ func (p *SubstackPublisher) SaveToDraft(ctx context.Context, content publisher.P
 			successfulUploads = count
 		}
 	}
-	
-	p.logger.Debug("Resources processed successfully", 
+
+	p.logger.Debug("Resources processed successfully",
 		zap.Int("successful_uploads", successfulUploads))
 
-	// Note: Skip final update step as image uploads may have already updated the draft
-	// and caused version conflicts (409 "Post out of date" error)
 	if successfulUploads > 0 {
-		p.logger.Info("Images uploaded successfully, draft auto-updated by Substack", 
+		latestDraft, err := p.getDraft(ctx, draftResponse.ID)
+		if err != nil {
+			updateErr := fmt.Errorf("failed to refresh Substack draft before image URL update: %w", err)
+			p.logger.Error("Failed to refresh Substack draft", zap.Error(updateErr))
+			return &publisher.PublishResult{
+				Success:  false,
+				Error:    updateErr,
+				ErrorMsg: updateErr.Error(),
+			}, nil
+		}
+
+		lastUpdatedAt := latestDraft.DraftUpdatedAt
+		if lastUpdatedAt == "" {
+			lastUpdatedAt = draftResponse.DraftUpdatedAt
+		}
+
+		draftBylines := latestDraft.DraftBylines
+		if len(draftBylines) == 0 {
+			draftBylines = draftResponse.DraftBylines
+		}
+
+		updateRequest := SubstackUpdateDraftRequest{
+			DraftTitle:                  transformedContent.Title,
+			DraftSubtitle:               subtitle,
+			DraftPodcastURL:             "",
+			DraftPodcastDuration:        nil,
+			DraftVideoUploadID:          nil,
+			DraftPodcastUploadID:        nil,
+			DraftPodcastPreviewUploadID: nil,
+			DraftVoiceoverUploadID:      nil,
+			DraftBody:                   transformedContent.Content,
+			SectionChosen:               false,
+			DraftSectionID:              nil,
+			DraftBylines:                draftBylines,
+			LastUpdatedAt:               lastUpdatedAt,
+		}
+
+		if err := p.updateDraft(ctx, draftResponse.ID, updateRequest); err != nil {
+			updateErr := fmt.Errorf("failed to update Substack draft with uploaded image URLs: %w", err)
+			p.logger.Error("Failed to update Substack draft with uploaded image URLs", zap.Error(updateErr))
+			return &publisher.PublishResult{
+				Success:  false,
+				Error:    updateErr,
+				ErrorMsg: updateErr.Error(),
+			}, nil
+		}
+
+		p.logger.Info("Updated Substack draft with uploaded image URLs",
 			zap.Int("successful_uploads", successfulUploads),
 			zap.Int("draft_id", draftResponse.ID))
 	}
@@ -405,8 +450,8 @@ func (p *SubstackPublisher) createDraft(ctx context.Context, request SubstackCre
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal draft request: %w", err)
 	}
-	
-	p.logger.Debug("Creating Substack draft", 
+
+	p.logger.Debug("Creating Substack draft",
 		zap.String("url", url),
 		zap.String("request_body", string(jsonData)))
 
@@ -442,15 +487,52 @@ func (p *SubstackPublisher) createDraft(ctx context.Context, request SubstackCre
 		return nil, fmt.Errorf("failed to read response: %w", err)
 	}
 
-	p.logger.Debug("Substack API response", 
+	p.logger.Debug("Substack API response",
 		zap.Int("status_code", resp.StatusCode),
 		zap.String("response_body", string(body)))
 
 	if resp.StatusCode != http.StatusOK {
-		p.logger.Error("Substack API error", 
-			zap.Int("status_code", resp.StatusCode), 
+		p.logger.Error("Substack API error",
+			zap.Int("status_code", resp.StatusCode),
 			zap.String("response_body", string(body)),
 			zap.String("request_url", url))
+		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var draftResponse SubstackDraftResponse
+	if err := json.Unmarshal(body, &draftResponse); err != nil {
+		return nil, fmt.Errorf("failed to parse response: %w", err)
+	}
+
+	return &draftResponse, nil
+}
+
+func (p *SubstackPublisher) getDraft(ctx context.Context, draftID int) (*SubstackDraftResponse, error) {
+	url := fmt.Sprintf("https://%s/api/v1/drafts/%d", p.domain, draftID)
+
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	req.Header.Set("Cookie", p.cookie)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Accept-Language", "en,zh-CN;q=0.9,zh;q=0.8")
+	req.Header.Set("Referer", fmt.Sprintf("https://%s/publish/post/%d", p.domain, draftID))
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36")
+
+	resp, err := p.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -509,7 +591,7 @@ func (p *SubstackPublisher) uploadImage(ctx context.Context, imageURL string, po
 	if err != nil {
 		return "", fmt.Errorf("failed to download and encode image: %w", err)
 	}
-	
+
 	url := fmt.Sprintf("https://%s/api/v1/image", p.domain)
 
 	request := SubstackImageUploadRequest{
@@ -603,7 +685,7 @@ func (p *SubstackPublisher) downloadAndEncodeImage(ctx context.Context, imageURL
 	base64Data := base64.StdEncoding.EncodeToString(imageData)
 	dataURL := fmt.Sprintf("data:%s;base64,%s", contentType, base64Data)
 
-	p.logger.Debug("Image downloaded and encoded", 
+	p.logger.Debug("Image downloaded and encoded",
 		zap.String("url", imageURL),
 		zap.String("content_type", contentType),
 		zap.Int("data_size", len(imageData)))
