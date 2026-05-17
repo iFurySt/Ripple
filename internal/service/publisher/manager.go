@@ -298,33 +298,14 @@ func (m *Manager) PublishSinglePlatform(ctx context.Context, page *models.Notion
 		}, nil
 	}
 
-	// Transform content
-	transformedContent, err := publisher.TransformContent(ctx, *content)
-	if err != nil {
-		return &PublishResult{
-			Success:  false,
-			Error:    err,
-			ErrorMsg: err.Error(),
-		}, nil
-	}
-
-	// Process resources
-	if err := publisher.ProcessResources(ctx, transformedContent, config); err != nil {
-		return &PublishResult{
-			Success:  false,
-			Error:    err,
-			ErrorMsg: err.Error(),
-		}, nil
-	}
-
 	var result *PublishResult
 
 	if isDraft {
 		// Save as draft
-		result, err = publisher.SaveToDraft(ctx, *transformedContent, config)
+		result, err = publisher.SaveToDraft(ctx, *content, config)
 	} else {
 		// Publish directly
-		result, err = publisher.PublishDirect(ctx, *transformedContent, config)
+		result, err = publisher.PublishDirect(ctx, *content, config)
 	}
 
 	if err != nil {
@@ -359,7 +340,7 @@ func (m *Manager) PublishSinglePlatform(ctx context.Context, page *models.Notion
 		PageID:     page.ID,
 		PlatformID: platformID,
 		Status:     status,
-		Content:    transformedContent.Content,
+		Content:    content.Content,
 	}
 
 	if result.Success && !isDraft {

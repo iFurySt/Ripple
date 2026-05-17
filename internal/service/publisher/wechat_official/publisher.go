@@ -185,6 +185,29 @@ func (p *WeChatOfficialPublisher) ProcessResources(ctx context.Context, content 
 }
 
 func (p *WeChatOfficialPublisher) SaveToDraft(ctx context.Context, content publisher.PublishContent, config publisher.PublishConfig) (*publisher.PublishResult, error) {
+	if looksLikeNotionBlocks(content.Content) {
+		transformedContent, err := p.TransformContent(ctx, content)
+		if err != nil {
+			transformErr := fmt.Errorf("content transformation failed: %w", err)
+			return &publisher.PublishResult{
+				Success:  false,
+				Error:    transformErr,
+				ErrorMsg: transformErr.Error(),
+			}, nil
+		}
+
+		if err := p.ProcessResources(ctx, transformedContent, config); err != nil {
+			mediaErr := fmt.Errorf("media processing failed: %w", err)
+			return &publisher.PublishResult{
+				Success:  false,
+				Error:    mediaErr,
+				ErrorMsg: mediaErr.Error(),
+			}, nil
+		}
+
+		content = *transformedContent
+	}
+
 	// Validate content before creating draft
 	if content.Title == "" {
 		titleErr := fmt.Errorf("article title is required")
@@ -508,4 +531,22 @@ func (p *WeChatOfficialPublisher) getIntConfig(value string, defaultValue int) i
 		return 0
 	}
 	return defaultValue
+}
+
+func looksLikeNotionBlocks(content string) bool {
+	trimmed := strings.TrimSpace(content)
+	if !strings.HasPrefix(trimmed, "[") {
+		return false
+	}
+
+	var blocks []map[string]any
+	if err := json.Unmarshal([]byte(trimmed), &blocks); err != nil {
+		return false
+	}
+	for _, block := range blocks {
+		if _, ok := block["type"].(string); ok {
+			return true
+		}
+	}
+	return false
 }
