@@ -376,70 +376,50 @@ func (t *SubstackTransformer) convertBlockToSubstack(block map[string]any, numbe
 }
 
 func (t *SubstackTransformer) convertTableToSubstackFallback(blocks []map[string]any, tableIndex int) (SubstackNode, int) {
-	markdown, nextIndex := t.convertTableToMarkdownFallback(blocks, tableIndex)
-	if markdown == "" {
-		return SubstackNode{}, nextIndex
-	}
-	return SubstackNode{
-		Type: "code_block",
-		Attrs: map[string]interface{}{
-			"language": "markdown",
-		},
-		Content: []SubstackNode{
-			{
-				Type: "text",
-				Text: markdown,
-			},
-		},
-	}, nextIndex
-}
-
-func (t *SubstackTransformer) convertTableToMarkdownFallback(blocks []map[string]any, tableIndex int) (string, int) {
 	tableContent, _ := blocks[tableIndex]["table"].(map[string]any)
 	hasColumnHeader, _ := tableContent["has_column_header"].(bool)
-	tableWidth := intFromAny(tableContent["table_width"])
+	hasRowHeader, _ := tableContent["has_row_header"].(bool)
 
-	var rows [][]string
+	var rows [][][]SubstackNode
 	nextIndex := tableIndex + 1
 	for nextIndex < len(blocks) {
 		blockType, _ := blocks[nextIndex]["type"].(string)
 		if blockType != "table_row" {
 			break
 		}
-		if row := t.extractTableRowPlainText(blocks[nextIndex]); len(row) > 0 {
+		if row := t.extractTableRowSubstack(blocks[nextIndex]); len(row) > 0 {
 			rows = append(rows, row)
-			if len(row) > tableWidth {
-				tableWidth = len(row)
-			}
 		}
 		nextIndex++
 	}
-	if len(rows) == 0 || tableWidth == 0 {
-		return "", nextIndex
+	if len(rows) == 0 {
+		return SubstackNode{}, nextIndex
 	}
 
-	for i := range rows {
-		for len(rows[i]) < tableWidth {
-			rows[i] = append(rows[i], "")
+	var headers [][]SubstackNode
+	dataRows := rows
+	if hasColumnHeader {
+		headers = rows[0]
+		dataRows = rows[1:]
+	}
+
+	var items []SubstackNode
+	for _, row := range dataRows {
+		if item := t.tableRowToListItem(row, headers, hasRowHeader); item.Type != "" {
+			items = append(items, item)
 		}
 	}
-
-	var out []string
-	if hasColumnHeader {
-		out = append(out, markdownTableRow(rows[0]))
-		out = append(out, markdownSeparatorRow(tableWidth))
-		out = append(out, rowsToMarkdown(rows[1:])...)
-	} else {
-		headers := make([]string, tableWidth)
-		out = append(out, markdownTableRow(headers))
-		out = append(out, markdownSeparatorRow(tableWidth))
-		out = append(out, rowsToMarkdown(rows)...)
+	if len(items) == 0 {
+		return SubstackNode{}, nextIndex
 	}
 
-	return strings.Join(out, "\n"), nextIndex
+	return SubstackNode{
+		Type:    "bullet_list",
+		Content: items,
+	}, nextIndex
 }
 
-func (t *SubstackTransformer) extractTableRowPlainText(block map[string]any) []string {
+func (t *SubstackTransformer) extractTableRowSubstack(block map[string]any) [][]SubstackNode {
 	rowContent, ok := block["table_row"].(map[string]any)
 	if !ok {
 		return nil
@@ -448,61 +428,86 @@ func (t *SubstackTransformer) extractTableRowPlainText(block map[string]any) []s
 	if !ok {
 		return nil
 	}
-	row := make([]string, 0, len(cells))
+	row := make([][]SubstackNode, 0, len(cells))
 	for _, cell := range cells {
 		richText, _ := cell.([]any)
-		row = append(row, escapeMarkdownTableCell(t.richTextArrayPlainText(richText)))
+		row = append(row, t.extractRichTextArrayToSubstack(richText))
 	}
 	return row
 }
 
-func (t *SubstackTransformer) richTextArrayPlainText(richText []any) string {
-	var text string
+func (t *SubstackTransformer) tableRowToListItem(row [][]SubstackNode, headers [][]SubstackNode, hasRowHeader bool) SubstackNode {
+	var content []SubstackNode
+	startCol := 0
+
+	if hasRowHeader && len(row) > 0 {
+		content = append(content, withStrongMark(row[0])...)
+		if len(row) > 1 {
+			content = append(content, textNode(": "))
+		}
+		startCol = 1
+	}
+
+	for col := startCol; col < len(row); col++ {
+		cell := row[col]
+		if len(cell) == 0 {
+			continue
+		}
+
+		if len(content) > 0 && !(hasRowHeader && col == startCol) {
+			content = append(content, textNode("; "))
+		}
+
+		if col < len(headers) && len(headers[col]) > 0 {
+			content = append(content, withStrongMark(headers[col])...)
+			content = append(content, textNode(": "))
+		}
+		content = append(content, cell...)
+	}
+
+	if len(content) == 0 {
+		return SubstackNode{}
+	}
+
+	return SubstackNode{
+		Type: "list_item",
+		Content: []SubstackNode{
+			{
+				Type:    "paragraph",
+				Content: content,
+			},
+		},
+	}
+}
+
+func (t *SubstackTransformer) extractRichTextArrayToSubstack(richText []any) []SubstackNode {
+	var nodes []SubstackNode
 	for _, rt := range richText {
 		if rtMap, ok := rt.(map[string]any); ok {
 			if plainText, ok := rtMap["plain_text"].(string); ok {
-				text += plainText
+				node := t.applySubstackFormatting(plainText, rtMap)
+				if node.Type != "" {
+					nodes = append(nodes, node)
+				}
 			}
 		}
 	}
-	return text
+	return nodes
 }
 
-func rowsToMarkdown(rows [][]string) []string {
-	out := make([]string, 0, len(rows))
-	for _, row := range rows {
-		out = append(out, markdownTableRow(row))
+func textNode(text string) SubstackNode {
+	return SubstackNode{Type: "text", Text: text}
+}
+
+func withStrongMark(nodes []SubstackNode) []SubstackNode {
+	out := make([]SubstackNode, 0, len(nodes))
+	for _, node := range nodes {
+		if node.Type == "text" {
+			node.Marks = append(node.Marks, SubstackMark{Type: "strong"})
+		}
+		out = append(out, node)
 	}
 	return out
-}
-
-func markdownTableRow(cells []string) string {
-	return "| " + strings.Join(cells, " | ") + " |"
-}
-
-func markdownSeparatorRow(width int) string {
-	parts := make([]string, width)
-	for i := range parts {
-		parts[i] = "---"
-	}
-	return "| " + strings.Join(parts, " | ") + " |"
-}
-
-func escapeMarkdownTableCell(text string) string {
-	text = strings.ReplaceAll(text, "\n", "<br>")
-	text = strings.ReplaceAll(text, "|", `\|`)
-	return text
-}
-
-func intFromAny(value any) int {
-	switch v := value.(type) {
-	case int:
-		return v
-	case float64:
-		return int(v)
-	default:
-		return 0
-	}
 }
 
 func (t *SubstackTransformer) extractRichTextToSubstack(blockContent map[string]any) []SubstackNode {

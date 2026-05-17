@@ -44,7 +44,7 @@ func convertNotionBlocksToMarkdown(blocksJSON string) (string, error) {
 		content = append(content, markdown)
 	}
 
-	return strings.Join(content, "\n"), nil
+	return strings.Join(content, "\n\n"), nil
 }
 
 func convertTableToMarkdown(blocks []map[string]any, tableIndex int) (string, int) {
