@@ -47,13 +47,22 @@ func convertNotionBlocksToEmailHTML(blocksJSON string) (string, error) {
 		}
 	}
 
-	for _, block := range blocks {
+	for i := 0; i < len(blocks); i++ {
+		block := blocks[i]
 		blockType, _ := block["type"].(string)
 		if blockType != "bulleted_list_item" && blockType != "numbered_list_item" {
 			closeLists()
 		}
 
 		switch blockType {
+		case "table":
+			tableHTML, nextIndex := tableToEmailHTML(blocks, i)
+			if tableHTML != "" {
+				content = append(content, tableHTML)
+			}
+			i = nextIndex - 1
+		case "table_row":
+			continue
 		case "bulleted_list_item":
 			if !inBulletedList {
 				content = append(content, `<ul style="list-style:none;padding:0;margin:18px 0 0;">`)
@@ -80,6 +89,102 @@ func convertNotionBlocksToEmailHTML(blocksJSON string) (string, error) {
 	closeLists()
 
 	return strings.Join(content, "\n"), nil
+}
+
+func tableToEmailHTML(blocks []map[string]any, tableIndex int) (string, int) {
+	tableContent, _ := blocks[tableIndex]["table"].(map[string]any)
+	hasColumnHeader, _ := tableContent["has_column_header"].(bool)
+	hasRowHeader, _ := tableContent["has_row_header"].(bool)
+
+	var rows [][]string
+	nextIndex := tableIndex + 1
+	for nextIndex < len(blocks) {
+		blockType, _ := blocks[nextIndex]["type"].(string)
+		if blockType != "table_row" {
+			break
+		}
+		if row := tableRowEmailHTML(blocks[nextIndex]); len(row) > 0 {
+			rows = append(rows, row)
+		}
+		nextIndex++
+	}
+	if len(rows) == 0 {
+		return "", nextIndex
+	}
+
+	var out strings.Builder
+	out.WriteString(`<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin:20px 0;color:#334155;">`)
+	for rowIndex, row := range rows {
+		out.WriteString("<tr>")
+		for colIndex, cell := range row {
+			tag := "td"
+			if (hasColumnHeader && rowIndex == 0) || (hasRowHeader && colIndex == 0) {
+				tag = "th"
+			}
+			style := `border:1px solid #d0d7de;padding:9px 11px;text-align:left;vertical-align:top;line-height:1.55;overflow-wrap:anywhere;`
+			if tag == "th" {
+				style += `font-weight:700;background:#f8fafc;color:#111827;`
+			}
+			out.WriteString(fmt.Sprintf(`<%s style="%s">%s</%s>`, tag, style, cell, tag))
+		}
+		out.WriteString("</tr>")
+	}
+	out.WriteString("</table>")
+	return out.String(), nextIndex
+}
+
+func tableRowEmailHTML(block map[string]any) []string {
+	rowContent, ok := block["table_row"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	cells, ok := rowContent["cells"].([]any)
+	if !ok {
+		return nil
+	}
+	row := make([]string, 0, len(cells))
+	for _, cell := range cells {
+		richText, _ := cell.([]any)
+		row = append(row, richTextArrayEmailHTML(richText))
+	}
+	return row
+}
+
+func richTextArrayEmailHTML(richText []any) string {
+	var out strings.Builder
+	for _, item := range richText {
+		rt, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		text, _ := rt["plain_text"].(string)
+		if text == "" {
+			continue
+		}
+		formatted := html.EscapeString(text)
+		if annotations, ok := rt["annotations"].(map[string]any); ok {
+			if v, _ := annotations["code"].(bool); v {
+				formatted = fmt.Sprintf("<code>%s</code>", formatted)
+			}
+			if v, _ := annotations["bold"].(bool); v {
+				formatted = fmt.Sprintf("<strong>%s</strong>", formatted)
+			}
+			if v, _ := annotations["italic"].(bool); v {
+				formatted = fmt.Sprintf("<em>%s</em>", formatted)
+			}
+			if v, _ := annotations["strikethrough"].(bool); v {
+				formatted = fmt.Sprintf("<s>%s</s>", formatted)
+			}
+			if v, _ := annotations["underline"].(bool); v {
+				formatted = fmt.Sprintf("<u>%s</u>", formatted)
+			}
+		}
+		if href, _ := rt["href"].(string); href != "" {
+			formatted = fmt.Sprintf(`<a href="%s" style="color:#2563eb;text-decoration:none;border-bottom:1px solid #bfdbfe;overflow-wrap:anywhere;">%s</a>`, html.EscapeString(href), formatted)
+		}
+		out.WriteString(formatted)
+	}
+	return out.String()
 }
 
 func blockToEmailHTML(block map[string]any) string {

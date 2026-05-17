@@ -1,6 +1,7 @@
 package substack
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -31,5 +32,30 @@ func TestUpdateImageReferencesReplacesJSONEscapedURLs(t *testing.T) {
 	}
 	if strings.Contains(result, "prod-files-secure.s3.us-west-2.amazonaws.com") {
 		t.Fatalf("expected original URL to be removed, got %s", result)
+	}
+}
+
+func TestTransformPreservesTablesAsMarkdownCodeBlocks(t *testing.T) {
+	transformer := NewSubstackTransformer()
+	content := `[
+		{"type":"table","table":{"table_width":2,"has_column_header":true,"has_row_header":false}},
+		{"type":"table_row","table_row":{"cells":[[{"plain_text":"Name","annotations":{}}],[{"plain_text":"Value","annotations":{}}]]}},
+		{"type":"table_row","table_row":{"cells":[[{"plain_text":"A","annotations":{}}],[{"plain_text":"B","annotations":{}}]]}}
+	]`
+
+	result, err := transformer.Transform(nil, content)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var doc SubstackDocument
+	if err := json.Unmarshal([]byte(result), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Content) != 1 || doc.Content[0].Type != "code_block" {
+		t.Fatalf("expected a markdown code block for table fallback, got: %#v", doc.Content)
+	}
+	if got := doc.Content[0].Content[0].Text; !strings.Contains(got, "| Name | Value |") || !strings.Contains(got, "| A | B |") {
+		t.Fatalf("expected markdown table content, got: %s", got)
 	}
 }

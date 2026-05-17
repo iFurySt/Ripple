@@ -17,7 +17,20 @@ func convertNotionBlocksToMarkdown(blocksJSON string) (string, error) {
 	var content []string
 	numberedListCounter := 0
 
-	for _, block := range blocks {
+	for i := 0; i < len(blocks); i++ {
+		block := blocks[i]
+		if blockType, _ := block["type"].(string); blockType == "table" {
+			markdown, nextIndex := convertTableToMarkdown(blocks, i)
+			if markdown != "" {
+				content = append(content, markdown)
+			}
+			i = nextIndex - 1
+			numberedListCounter = 0
+			continue
+		} else if blockType == "table_row" {
+			continue
+		}
+
 		markdown, skip, isNumberedList := convertBlockToMarkdownWithCounter(block, &numberedListCounter)
 		if skip {
 			continue
@@ -32,6 +45,115 @@ func convertNotionBlocksToMarkdown(blocksJSON string) (string, error) {
 	}
 
 	return strings.Join(content, "\n"), nil
+}
+
+func convertTableToMarkdown(blocks []map[string]any, tableIndex int) (string, int) {
+	tableContent, _ := blocks[tableIndex]["table"].(map[string]any)
+	hasColumnHeader, _ := tableContent["has_column_header"].(bool)
+	tableWidth := intFromAny(tableContent["table_width"])
+
+	var rows [][]string
+	nextIndex := tableIndex + 1
+	for nextIndex < len(blocks) {
+		blockType, _ := blocks[nextIndex]["type"].(string)
+		if blockType != "table_row" {
+			break
+		}
+		if row := extractTableRowMarkdown(blocks[nextIndex]); len(row) > 0 {
+			rows = append(rows, row)
+			if len(row) > tableWidth {
+				tableWidth = len(row)
+			}
+		}
+		nextIndex++
+	}
+
+	if len(rows) == 0 || tableWidth == 0 {
+		return "", nextIndex
+	}
+
+	for i := range rows {
+		for len(rows[i]) < tableWidth {
+			rows[i] = append(rows[i], "")
+		}
+	}
+
+	var out []string
+	if hasColumnHeader {
+		out = append(out, markdownTableRow(rows[0]))
+		out = append(out, markdownSeparatorRow(tableWidth))
+		for _, row := range rows[1:] {
+			out = append(out, markdownTableRow(row))
+		}
+	} else {
+		headers := make([]string, tableWidth)
+		out = append(out, markdownTableRow(headers))
+		out = append(out, markdownSeparatorRow(tableWidth))
+		for _, row := range rows {
+			out = append(out, markdownTableRow(row))
+		}
+	}
+
+	return strings.Join(out, "\n"), nextIndex
+}
+
+func extractTableRowMarkdown(block map[string]any) []string {
+	rowContent, ok := block["table_row"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	cells, ok := rowContent["cells"].([]any)
+	if !ok {
+		return nil
+	}
+
+	row := make([]string, 0, len(cells))
+	for _, cell := range cells {
+		richText, _ := cell.([]any)
+		row = append(row, escapeMarkdownTableCell(extractRichTextArrayToMarkdown(richText)))
+	}
+	return row
+}
+
+func extractRichTextArrayToMarkdown(richText []any) string {
+	var text string
+	for _, rt := range richText {
+		if rtMap, ok := rt.(map[string]any); ok {
+			if plainText, ok := rtMap["plain_text"].(string); ok {
+				text += applyRichTextFormatting(plainText, rtMap)
+			}
+		}
+	}
+	return cleanText(text)
+}
+
+func markdownTableRow(cells []string) string {
+	return "| " + strings.Join(cells, " | ") + " |"
+}
+
+func markdownSeparatorRow(width int) string {
+	parts := make([]string, width)
+	for i := range parts {
+		parts[i] = "---"
+	}
+	return "| " + strings.Join(parts, " | ") + " |"
+}
+
+func escapeMarkdownTableCell(text string) string {
+	text = strings.ReplaceAll(text, "\n", "<br>")
+	text = strings.ReplaceAll(text, "|", `\|`)
+	return text
+}
+
+func intFromAny(value any) int {
+	switch v := value.(type) {
+	case int:
+		return v
+	case float64:
+		return int(v)
+	default:
+		return 0
+	}
 }
 
 func convertBlockToMarkdownWithCounter(block map[string]any, numberedListCounter *int) (content string, skip bool, isNumberedList bool) {

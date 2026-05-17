@@ -17,7 +17,20 @@ func convertNotionBlocksToWeChatHTML(blocksJSON string) (string, error) {
 	var content []string
 	numberedListCounter := 0
 
-	for _, block := range blocks {
+	for i := 0; i < len(blocks); i++ {
+		block := blocks[i]
+		if blockType, _ := block["type"].(string); blockType == "table" {
+			tableHTML, nextIndex := convertTableToWeChatHTML(blocks, i)
+			if tableHTML != "" {
+				content = append(content, tableHTML)
+			}
+			i = nextIndex - 1
+			numberedListCounter = 0
+			continue
+		} else if blockType == "table_row" {
+			continue
+		}
+
 		html, skip, isNumberedList := convertBlockToWeChatHTMLWithCounter(block, &numberedListCounter)
 		if skip {
 			continue
@@ -34,11 +47,83 @@ func convertNotionBlocksToWeChatHTML(blocksJSON string) (string, error) {
 	}
 
 	result := strings.Join(content, "")
-	
+
 	// Clean up non-breaking spaces (0xa0) and replace with regular spaces
 	result = cleanWeChatText(result)
-	
+
 	return result, nil
+}
+
+func convertTableToWeChatHTML(blocks []map[string]any, tableIndex int) (string, int) {
+	tableContent, _ := blocks[tableIndex]["table"].(map[string]any)
+	hasColumnHeader, _ := tableContent["has_column_header"].(bool)
+	hasRowHeader, _ := tableContent["has_row_header"].(bool)
+
+	var rows [][]string
+	nextIndex := tableIndex + 1
+	for nextIndex < len(blocks) {
+		blockType, _ := blocks[nextIndex]["type"].(string)
+		if blockType != "table_row" {
+			break
+		}
+		if row := extractTableRowWeChatHTML(blocks[nextIndex]); len(row) > 0 {
+			rows = append(rows, row)
+		}
+		nextIndex++
+	}
+	if len(rows) == 0 {
+		return "", nextIndex
+	}
+
+	var out strings.Builder
+	out.WriteString(`<section style="margin:20px 10px;overflow-x:auto;">`)
+	out.WriteString(`<table style="width:100%;border-collapse:collapse;color:#3f3f3f;font-family:Optima-Regular, Optima, PingFangSC-light, PingFangTC-light, 'PingFang SC', Cambria, Cochin, Georgia, Times, 'Times New Roman', serif;font-size:14px;line-height:1.5;">`)
+	for rowIndex, row := range rows {
+		out.WriteString("<tr>")
+		for colIndex, cell := range row {
+			tag := "td"
+			if (hasColumnHeader && rowIndex == 0) || (hasRowHeader && colIndex == 0) {
+				tag = "th"
+			}
+			style := "border:1px solid #d9d9d9;padding:8px 10px;text-align:left;vertical-align:top;"
+			if tag == "th" {
+				style += "font-weight:bold;background:#f8f5ec;"
+			}
+			out.WriteString(fmt.Sprintf(`<%s style="%s">%s</%s>`, tag, style, cell, tag))
+		}
+		out.WriteString("</tr>")
+	}
+	out.WriteString("</table></section>")
+	return out.String(), nextIndex
+}
+
+func extractTableRowWeChatHTML(block map[string]any) []string {
+	rowContent, ok := block["table_row"].(map[string]any)
+	if !ok {
+		return nil
+	}
+	cells, ok := rowContent["cells"].([]any)
+	if !ok {
+		return nil
+	}
+	row := make([]string, 0, len(cells))
+	for _, cell := range cells {
+		richText, _ := cell.([]any)
+		row = append(row, extractRichTextArrayToWeChatHTML(richText))
+	}
+	return row
+}
+
+func extractRichTextArrayToWeChatHTML(richText []any) string {
+	var text string
+	for _, rt := range richText {
+		if rtMap, ok := rt.(map[string]any); ok {
+			if plainText, ok := rtMap["plain_text"].(string); ok {
+				text += applyWeChatHTMLFormatting(plainText, rtMap)
+			}
+		}
+	}
+	return text
 }
 
 func convertBlockToWeChatHTMLWithCounter(block map[string]any, numberedListCounter *int) (content string, skip bool, isNumberedList bool) {
@@ -112,7 +197,7 @@ func convertBlockToWeChatHTMLWithCounter(block map[string]any, numberedListCount
 			for range lines {
 				lineNumbers += "<li></li>"
 			}
-			
+
 			codeLines := ""
 			for _, line := range lines {
 				if line == "" {
@@ -120,7 +205,7 @@ func convertBlockToWeChatHTMLWithCounter(block map[string]any, numberedListCount
 				}
 				codeLines += fmt.Sprintf(`<code><span class="code-snippet_outer">%s</span></code>`, escapeHTML(line))
 			}
-			
+
 			content = fmt.Sprintf(`<section class="code-snippet__fix code-snippet__js"><ul class="code-snippet__line-index code-snippet__js">%s</ul><pre class="code-snippet__js" data-lang="%s">%s</pre></section>`, lineNumbers, language, codeLines)
 		}
 		return
