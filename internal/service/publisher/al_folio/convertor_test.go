@@ -31,3 +31,19 @@ func TestConvertNotionBlocksToMarkdownIncludesTables(t *testing.T) {
 		}
 	}
 }
+
+func TestConvertNotionBlocksToMarkdownNormalizesPlainTextCodeLanguage(t *testing.T) {
+	content := `[
+		{"type":"code","code":{"language":"plain text","rich_text":[{"plain_text":"hello\nworld","annotations":{}}]}}
+	]`
+
+	result, err := convertNotionBlocksToMarkdown(content)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := "```plaintext\nhello\nworld\n```"
+	if result != want {
+		t.Fatalf("expected %q, got:\n%s", want, result)
+	}
+}

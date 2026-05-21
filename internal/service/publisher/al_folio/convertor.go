@@ -216,7 +216,7 @@ func convertBlockToMarkdownWithCounter(block map[string]any, numberedListCounter
 		text := extractRichTextToMarkdown(blockContent)
 		language := ""
 		if lang, ok := blockContent["language"].(string); ok {
-			language = lang
+			language = normalizeCodeLanguage(lang)
 		}
 		if text != "" {
 			content = "```" + language + "\n" + cleanText(text) + "\n```"
@@ -298,6 +298,15 @@ func cleanText(text string) string {
 	text = strings.ReplaceAll(text, "\u00a0", " ")
 
 	return text
+}
+
+func normalizeCodeLanguage(language string) string {
+	switch strings.ToLower(strings.TrimSpace(language)) {
+	case "plain text", "plain_text", "text", "txt":
+		return "plaintext"
+	default:
+		return strings.TrimSpace(language)
+	}
 }
 
 func extractRichTextToMarkdown(blockContent map[string]any) string {
