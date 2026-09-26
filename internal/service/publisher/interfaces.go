@@ -10,15 +10,16 @@ import (
 
 // PublishContent represents the content to be published
 type PublishContent struct {
-	ID          string            `json:"id"`
-	Title       string            `json:"title"`
-	Content     string            `json:"content"`
-	Summary     string            `json:"summary"`
-	Tags        []string          `json:"tags"`
-	Author      string            `json:"author"`
-	PublishDate *time.Time        `json:"publish_date"`
-	Metadata    map[string]string `json:"metadata"`
-	Resources   []Resource        `json:"resources"`
+	ID           string            `json:"id"`
+	Title        string            `json:"title"`
+	Content      string            `json:"content"`
+	Summary      string            `json:"summary"`
+	Tags         []string          `json:"tags"`
+	ContentTypes []string          `json:"content_types"`
+	Author       string            `json:"author"`
+	PublishDate  *time.Time        `json:"publish_date"`
+	Metadata     map[string]string `json:"metadata"`
+	Resources    []Resource        `json:"resources"`
 }
 
 // Resource represents a media resource (image, video, etc.)
@@ -44,7 +45,7 @@ type PublishResult struct {
 	Success     bool              `json:"success"`
 	PublishID   string            `json:"publish_id,omitempty"`
 	URL         string            `json:"url,omitempty"`
-	Error       error             `json:"-"` // Don't serialize error directly
+	Error       error             `json:"-"`               // Don't serialize error directly
 	ErrorMsg    string            `json:"error,omitempty"` // Serialize error message as string
 	Metadata    map[string]string `json:"metadata,omitempty"`
 	PublishedAt time.Time         `json:"published_at"`
@@ -102,14 +103,15 @@ func FromNotionPage(page *models.NotionPage) *PublishContent {
 	}
 
 	return &PublishContent{
-		ID:          page.NotionID,
-		Title:       page.Title,
-		Content:     page.Content,
-		Summary:     page.Summary,
-		Tags:        tags,
-		Author:      page.Owner,
-		PublishDate: page.PostDate,
-		Metadata:    metadata,
-		Resources:   []Resource{}, // Will be populated during processing
+		ID:           page.NotionID,
+		Title:        page.Title,
+		Content:      page.Content,
+		Summary:      page.Summary,
+		Tags:         tags,
+		ContentTypes: contentTypes,
+		Author:       page.Owner,
+		PublishDate:  page.PostDate,
+		Metadata:     metadata,
+		Resources:    []Resource{}, // Will be populated during processing
 	}
 }

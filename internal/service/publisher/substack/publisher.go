@@ -166,7 +166,10 @@ func (p *SubstackPublisher) TransformContent(ctx context.Context, content publis
 	}
 
 	// Create new content with transformed data
+	// Substack labels come exclusively from Notion Content Type, never the
+	// legacy Tags field, which may contain publishing platform names.
 	result := content
+	result.Tags = append([]string(nil), content.ContentTypes...)
 	result.Content = transformedContent
 	result.Resources = resources
 

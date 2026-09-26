@@ -155,7 +155,7 @@ func (s *Service) extractPlatforms(properties map[string]any) models.StringArray
 func (s *Service) extractContentType(properties map[string]any) models.StringArray {
 	// Look for Content type multi_select property
 	for propName, prop := range properties {
-		if propName == "Content type" {
+		if strings.EqualFold(propName, "Content Type") {
 			if propMap, ok := prop.(map[string]any); ok {
 				if propMap["type"] == "multi_select" {
 					if contentTypes, ok := propMap["multi_select"].([]any); ok {

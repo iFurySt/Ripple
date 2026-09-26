@@ -1,6 +1,10 @@
 package substack
 
 import (
+	"context"
+	"github.com/ifuryst/ripple/internal/models"
+	"github.com/ifuryst/ripple/internal/service/publisher"
+	"go.uber.org/zap"
 	"reflect"
 	"testing"
 )
@@ -26,5 +30,30 @@ func TestFindSubstackTagMatchesNameCanonicalNameAndSlug(t *testing.T) {
 
 	if tag := findSubstackTag(tags, "browser-use"); tag == nil || tag.ID != "tag-2" {
 		t.Fatalf("expected to match tag 2 by slug, got %#v", tag)
+	}
+}
+
+func TestNotionContentTypeSuppliesSubstackTags(t *testing.T) {
+	for _, types := range []models.StringArray{{"AI", "Research, Notes"}, {}} {
+		page := &models.NotionPage{
+			Content:     "[]",
+			Tags:        models.StringArray{"Blog", "Substack"},
+			Platforms:   models.StringArray{"Blog", "Substack"},
+			ContentType: types,
+		}
+		content := publisher.FromNotionPage(page)
+		p := NewSubstackPublisher(zap.NewNop())
+		transformed, err := p.TransformContent(context.Background(), *content)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(transformed.Tags) != len(types) {
+			t.Fatalf("expected content types %v, got %v", types, transformed.Tags)
+		}
+		for i := range types {
+			if transformed.Tags[i] != types[i] {
+				t.Fatalf("expected content types %v, got %v", types, transformed.Tags)
+			}
+		}
 	}
 }
